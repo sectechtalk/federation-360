@@ -51,3 +51,7 @@ tests/        vitest tests
 ```
 
 Sample certificates and tokens are generated for examples only and sign nothing real.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
