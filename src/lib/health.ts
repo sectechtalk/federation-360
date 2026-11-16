@@ -34,7 +34,8 @@ export function appHealth(app: AppIntegration, now = new Date()): Finding[] {
       if (app.environment === "prod" && /localhost|127\.0\.0\.1/.test(u)) f.push({ severity: "warn", title: "Localhost redirect URI on a production app", detail: u });
     }
     if (o.grantType === "implicit") f.push({ severity: "warn", title: "Implicit flow", detail: "Move to authorization code with PKCE. Implicit is deprecated in OAuth 2.1." });
-    if (o.clientType === "confidential") {
+    const tenantSaysNoCredential = !!app.discovery && !app.discovery.credentials.some((c) => c.on === "application");
+    if (o.clientType === "confidential" && !tenantSaysNoCredential) {
       const d = daysUntil(o.secretExpires, now);
       if (!o.secretExpires) f.push({ severity: "info", title: "Secret/certificate expiry not recorded" });
       else if (d < 0) f.push({ severity: "critical", title: `Client secret expired ${-d} days ago`, playbook: "AADSTS7000222" });
@@ -42,13 +43,48 @@ export function appHealth(app: AppIntegration, now = new Date()): Finding[] {
       else if (d <= 60) f.push({ severity: "info", title: `Client secret expires in ${d} days` });
     }
   }
+  if (app.provisioning === "scim") {
+    const s = app.scim;
+    if (!s?.endpoint) f.push({ severity: "info", title: "SCIM endpoint (Tenant URL) not recorded" });
+    else if (s.endpoint.startsWith("http://")) f.push({ severity: "critical", title: "SCIM endpoint uses plain HTTP", detail: `${s.endpoint}. User data and the bearer token would travel unencrypted.` });
+    const d = daysUntil(s?.tokenExpires ?? "", now);
+    if (!s?.tokenExpires) f.push({ severity: "info", title: "SCIM token expiry not recorded", detail: "When the token expires, provisioning stops without any sign-in error: joiners get no account and leavers keep theirs." });
+    else if (d < 0) f.push({ severity: "critical", title: `SCIM token expired ${-d} days ago`, detail: "Provisioning has stopped. New users have no account in the app and leavers are not being disabled.", playbook: "scim-401" });
+    else if (d <= 30) f.push({ severity: "warn", title: `SCIM token expires in ${d} days`, playbook: "scim-401" });
+    else if (d <= 60) f.push({ severity: "info", title: `SCIM token expires in ${d} days` });
+    if (s && app.protocol === "saml" && s.userNameSource && app.saml.nameIdSource) {
+      const norm = (v: string) => v.toLowerCase().replace(/^user\./, "").trim();
+      if (norm(s.userNameSource) !== norm(app.saml.nameIdSource)) {
+        f.push({
+          severity: "warn",
+          title: "Sign-in and provisioning use different source attributes",
+          detail: `SAML NameID comes from ${app.saml.nameIdSource}; SCIM userName comes from ${s.userNameSource}. Users whose two values differ pass Entra sign-in and are “not found” by the app.`,
+          playbook: "scim-identifier-mismatch",
+        });
+      }
+    }
+  }
+  if (app.provisioning === "jit") f.push({ severity: "info", title: "Accounts are created at first sign-in (JIT)", detail: "Nothing removes the account when someone leaves. Add SCIM or a manual leaver step.", playbook: "scim-leaver" });
+  if (app.discovery) {
+    const d = app.discovery;
+    if (d.missing) f.push({ severity: "warn", title: "Not found in the last tenant scan", detail: "It may have been deleted or renamed in the identity provider. Check, then delete this entry if it's gone." });
+    if (!d.enabled && d.servicePrincipalId) f.push({ severity: "info", title: "Sign-in is disabled for this app in the tenant" });
+    for (const c of d.credentials) {
+      const left = daysUntil(c.end.slice(0, 10), now);
+      if (left < 0 && !(app.protocol === "saml" && c.thumbprint && c.thumbprint === app.saml.certThumbprint))
+        f.push({ severity: "info", title: `${c.kind === "secret" ? "Secret" : "Certificate"} “${c.name}” expired ${-left} days ago and is still attached`, detail: "Remove credentials you no longer use so nobody can mistake them for the live one." });
+    }
+  }
   if (!app.owner) f.push({ severity: "info", title: "No owner recorded", detail: "Every integration needs an accountable owner for access reviews and incidents." });
   return f;
 }
 
+/** The credential on this integration that expires soonest. */
 export function nextExpiry(app: AppIntegration): { date: string; what: string } | null {
-  if (app.protocol === "saml" && app.saml.certExpires) return { date: app.saml.certExpires, what: "Signing certificate" };
+  const all: { date: string; what: string }[] = [];
+  if (app.protocol === "saml" && app.saml.certExpires) all.push({ date: app.saml.certExpires, what: "Signing certificate" });
   if ((app.protocol === "oidc" || app.protocol === "oauth") && app.oidc.clientType === "confidential" && app.oidc.secretExpires)
-    return { date: app.oidc.secretExpires, what: "Client secret" };
-  return null;
+    all.push({ date: app.oidc.secretExpires, what: "Client secret" });
+  if (app.provisioning === "scim" && app.scim?.tokenExpires) all.push({ date: app.scim.tokenExpires, what: "SCIM token" });
+  return all.sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
 }

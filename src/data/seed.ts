@@ -43,6 +43,7 @@ export function exampleData(): { tenants: Tenant[]; apps: AppIntegration[] } {
       owner: "Cloud Platform team",
       saml: { ...emptySaml(), entityId: "https://us-east-1.signin.aws.amazon.com/platform/saml/d-9067000000", acsUrl: "https://us-east-1.signin.aws.amazon.com/platform/saml/acs/1a2b3c4d-example", signOnUrl: "https://d-9067000000.awsapps.com/start", idpEntityId: `https://sts.windows.net/${EXAMPLE_TENANT_ID}/`, nameIdFormat: "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress", certThumbprint: "0E24FD3E6EFE4791B1836C578E37C358511533F8", certExpires: day(20) },
       provisioning: "scim",
+      scim: { endpoint: "https://scim.us-east-1.amazonaws.com/a1b2c3d4-example/scim/v2", tokenExpires: day(24), matchAttribute: "userName", userNameSource: "userPrincipalName" },
       notes: "SCIM token in IAM Identity Center expires yearly. Example data.",
     }),
     base({

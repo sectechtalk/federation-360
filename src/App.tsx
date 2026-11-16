@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Ctx, Icon, useToastState, type AppCtx } from "./components/ui";
+import { Ctx, useToastState, type AppCtx } from "./components/ui";
 import { useCollection, useStore } from "./lib/store";
 import type { AppIntegration, Tenant } from "./lib/types";
 import { exampleData } from "./data/seed";
+import GettingStarted from "./views/GettingStarted";
 import Overview from "./views/Overview";
 import Inventory from "./views/Inventory";
 import Wizards from "./views/Wizards";
@@ -11,21 +12,38 @@ import JwtTool from "./views/JwtTool";
 import MetadataTool from "./views/MetadataTool";
 import Playbooks from "./views/Playbooks";
 import Learn from "./views/Learn";
+import Lab from "./views/Lab";
+import ScimTool from "./views/ScimTool";
+import Discover from "./views/Discover";
+import FlowTracer from "./views/FlowTracer";
+import LiveTest from "./views/LiveTest";
+import Connectivity from "./views/Connectivity";
+import { AppSwitcher, NavIcon, NavSection, ThemeToggle, useNavDrawer } from "./360/Shell360";
 
 const ROUTES = [
-  { id: "overview", label: "Overview", group: "Manage", icon: Icon.overview, el: Overview },
-  { id: "inventory", label: "Inventory", group: "Manage", icon: Icon.inventory, el: Inventory },
-  { id: "wizards", label: "Setup wizards", group: "Manage", icon: Icon.wizards, el: Wizards },
-  { id: "saml", label: "SAML decoder", group: "Troubleshoot", icon: Icon.saml, el: SamlTool },
-  { id: "jwt", label: "JWT decoder", group: "Troubleshoot", icon: Icon.jwt, el: JwtTool },
-  { id: "metadata", label: "Metadata checker", group: "Troubleshoot", icon: Icon.metadata, el: MetadataTool },
-  { id: "playbooks", label: "Playbooks", group: "Troubleshoot", icon: Icon.playbooks, el: Playbooks },
-  { id: "learn", label: "Learn", group: "Learn", icon: Icon.learn, el: Learn },
+  { id: "start", label: "Start here", group: "Getting started", icon: "rocket", el: GettingStarted },
+  { id: "overview", label: "Overview", group: "Manage", icon: "layout-dashboard", el: Overview },
+  { id: "inventory", label: "Inventory", group: "Manage", icon: "boxes", el: Inventory },
+  { id: "discover", label: "Discover", group: "Manage", icon: "compass", el: Discover },
+  { id: "wizards", label: "Setup wizards", group: "Manage", icon: "wand-sparkles", el: Wizards },
+  { id: "flowtracer", label: "Flow tracer", group: "Troubleshoot", icon: "radar", el: FlowTracer },
+  { id: "livetest", label: "Live test", group: "Troubleshoot", icon: "test-tube", el: LiveTest },
+  { id: "connectivity", label: "Connectivity test", group: "Troubleshoot", icon: "monitor-dot", el: Connectivity },
+  { id: "saml", label: "SAML decoder", group: "Troubleshoot", icon: "file-code", el: SamlTool },
+  { id: "jwt", label: "JWT decoder", group: "Troubleshoot", icon: "braces", el: JwtTool },
+  { id: "scim", label: "SCIM checker", group: "Troubleshoot", icon: "users", el: ScimTool },
+  { id: "metadata", label: "Metadata checker", group: "Troubleshoot", icon: "file-check", el: MetadataTool },
+  { id: "playbooks", label: "Playbooks", group: "Troubleshoot", icon: "book-open", el: Playbooks },
+  { id: "learn", label: "Learn", group: "Learn", icon: "graduation-cap", el: Learn },
+  { id: "lab", label: "Build your lab", group: "Learn", icon: "flask-conical", el: Lab },
 ] as const;
+
+// The page f-360 opens on when the address has no #page (or an unknown one).
+const DEFAULT_ROUTE = "start";
 
 const routeFromHash = () => {
   const h = location.hash.replace(/^#/, "");
-  return ROUTES.some((r) => r.id === h) ? h : "overview";
+  return ROUTES.some((r) => r.id === h) ? h : DEFAULT_ROUTE;
 };
 
 function Mark() {
@@ -45,6 +63,7 @@ export default function App() {
   const t = useCollection<Tenant>(store, "tenants");
   const a = useCollection<AppIntegration>(store, "apps");
   const { msg, toast } = useToastState();
+  const menuButton = useNavDrawer("rail");
 
   useEffect(() => {
     const on = () => setRoute(routeFromHash());
@@ -98,37 +117,40 @@ export default function App() {
   );
 
   const View = ROUTES.find((r) => r.id === route)!.el;
-  const groups = ["Manage", "Troubleshoot", "Learn"];
+  const groups = ["Getting started", "Manage", "Troubleshoot", "Learn"];
 
   return (
     <Ctx.Provider value={ctx}>
       <div className="shell">
-        <nav className="rail" aria-label="Main">
+        <nav className="rail" id="rail" aria-label="Main">
           <div className="brand">
             <Mark />
             <div>
               <div className="brand-name">Federation 360</div>
-              <div className="brand-sub">SAML · OIDC · OAuth</div>
+              <div className="brand-sub">SAML · OIDC · OAuth · SCIM</div>
             </div>
           </div>
+          <AppSwitcher current="f-360" />
           {groups.map((g) => (
-            <div className="nav-group" key={g}>
-              <div className="nav-label">{g}</div>
+            <NavSection key={g} title={g} current={ROUTES.some((r) => r.group === g && r.id === route)}>
               {ROUTES.filter((r) => r.group === g).map((r) => (
                 <a key={r.id} className="nav-item" href={"#" + r.id} aria-current={route === r.id ? "page" : undefined} onClick={() => setParams({})}>
-                  {r.icon}
+                  <NavIcon name={r.icon} />
                   {r.label}
                 </a>
               ))}
-            </div>
+            </NavSection>
           ))}
+          <div className="rail-tools">
+            <ThemeToggle />
+          </div>
           <div className="rail-foot">
             <span>{store ? (store.kind === "cloud" ? "Inventory saved to this artifact" : "Inventory saved in this browser") : "Connecting storage…"}</span>
-            <span>Tokens and assertions you paste stay on this page; nothing is sent anywhere.</span>
-            <span>SCIM module: planned</span>
+            <span>Tokens, assertions and SCIM messages you paste stay on this page. Discover talks only to Microsoft, read-only, and only when you sign in. Flow tracer reads HAR files in this tab; Live test talks only to Microsoft and the lab test app on your PC. Connectivity test results you drop in stay on this page.</span>
           </div>
         </nav>
         <main className="main">
+          {menuButton}
           {(t.error || a.error) && (
             <div className="page" style={{ marginBottom: 16 }}>
               <div className="callout warn">The saved inventory couldn't be loaded: {t.error || a.error}. The tools still work; reload to try again.</div>

@@ -1,6 +1,7 @@
 import { useApp, ProtoChip, Sev } from "../components/ui";
 import { appHealth, daysUntil, nextExpiry, worst } from "../lib/health";
 import { PROTOCOLS } from "../lib/protocols";
+import { usePref } from "../lib/store";
 import { ENV_LABEL, PLATFORM_LABEL, type Severity } from "../lib/types";
 
 export default function Overview() {
@@ -17,25 +18,65 @@ export default function Overview() {
   const tenantName = (id: string) => tenants.find((t) => t.id === id)?.name ?? "No tenant";
   const anyExamples = apps.some((a) => a.example) || tenants.some((t) => t.example);
 
+  const critical = scored.filter((s) => s.sev === "critical");
+  const warned = scored.filter((s) => s.sev === "warn");
+  const soon = expiries.filter((e) => e.days <= 30);
+  const noOwner = apps.filter((a) => !a.owner.trim());
+  const [welcomeHidden, setWelcomeHidden] = usePref("overview-welcome-hidden", false);
+
+  // Plain-words "what to do today", most urgent first. Each item points at the one place that fixes it.
+  const today: { tone: "crit" | "warn" | "info"; text: string; btn?: { label: string; run: () => void } }[] = [];
+  if (critical.length)
+    today.push({ tone: "crit", text: `${critical.length} app${critical.length === 1 ? " has a problem" : "s have a problem"} that will probably stop people signing in. Start with ${critical[0].app.name}: open it, read what's wrong and follow its playbook.`, btn: { label: `Open ${critical[0].app.name}`, run: () => go("inventory", { app: critical[0].app.id }) } });
+  if (soon.length)
+    today.push({ tone: "warn", text: `${soon.length} certificate${soon.length === 1 ? " or secret has" : "s or secrets have"} expired or will expire within 30 days. When one expires, sign-in to that app stops. Contact the app's owner and plan the renewal.`, btn: { label: "How to renew without an outage", run: () => go("learn") } });
+  if (warned.length)
+    today.push({ tone: "warn", text: `${warned.length} app${warned.length === 1 ? " has a warning" : "s have warnings"}: working today, but set up in a way that is risky or will break later. Fix these when nothing is on fire.` });
+  if (noOwner.length)
+    today.push({ tone: "info", text: `${noOwner.length} app${noOwner.length === 1 ? " has" : "s have"} no owner recorded. Add one in Inventory so you know who on the app side to call when it breaks.`, btn: { label: "Open Inventory", run: () => go("inventory") } });
+  if (anyExamples)
+    today.push({ tone: "info", text: "Everything on this page is made-up example data, so you can see what healthy and broken apps look like. When you're ready, Discover reads your real apps; then delete the examples (marked Example) in Inventory.", btn: { label: "Open Discover", run: () => go("discover") } });
+
   return (
     <div className="page">
       <div className="page-head">
         <div>
           <h1>Overview</h1>
-          <p>Health of every SSO and API integration you track, across tenants and environments. Start with anything marked as a problem.</p>
+          <p>
+            Today's health of every app that signs people in through your directory, in one place. Anything that needs you is listed first, in plain words,
+            with a button that takes you to the fix.
+          </p>
         </div>
         <div className="row">
-          <button className="btn" onClick={() => go("wizards")}>Set up an integration</button>
-          <button className="btn primary" onClick={() => go("saml")}>Troubleshoot a sign-in</button>
+          <button className="btn" onClick={() => go("wizards")}>Set up a new app</button>
+          <button className="btn primary" onClick={() => go("playbooks")}>Fix a sign-in problem</button>
         </div>
       </div>
 
+      {!welcomeHidden && (
+        <section className="panel stack" aria-label="Welcome">
+          <h2>New to SAML, OIDC and SCIM?</h2>
+          <p style={{ maxWidth: "75ch" }}>
+            Start on Getting started. It explains what they are in plain words, gives you a step-by-step path for your first weeks, and tells you which page to
+            open when someone asks you for something. This page is the one you'll come back to every week once you're set up.
+          </p>
+          <div className="row">
+            <button className="btn primary" onClick={() => go("start")}>Open Getting started</button>
+            <button className="btn" onClick={() => setWelcomeHidden(true)}>Hide this</button>
+          </div>
+        </section>
+      )}
+
       {!loading && apps.length === 0 && (
         <div className="empty">
-          <h3>Your inventory is empty</h3>
-          <p className="muted">Add the tenants and apps you manage, or load a set of fictional examples to explore every screen first.</p>
+          <h3>Nothing here yet</h3>
+          <p className="muted" style={{ maxWidth: "60ch" }}>
+            This page fills in once Federation 360 knows about your apps. The quickest way is Discover, which reads them from your tenant without changing
+            anything. You can also add them by hand, or load made-up examples to see what every screen looks like first.
+          </p>
           <div className="row">
-            <button className="btn primary" onClick={() => go("inventory", { add: "tenant" })}>Add a tenant</button>
+            <button className="btn primary" onClick={() => go("discover")}>Read my apps with Discover</button>
+            <button className="btn" onClick={() => go("inventory", { add: "tenant" })}>Add a tenant by hand</button>
             <button className="btn" onClick={loadExamples}>Load example data</button>
           </div>
         </div>
@@ -43,20 +84,50 @@ export default function Overview() {
 
       {apps.length > 0 && (
         <>
-          {anyExamples && <p className="small muted">Showing fictional example data (marked “Example”). Delete it from the inventory when you add your own.</p>}
+          <section className="panel stack">
+            <div className="panel-head">
+              <h2>What to do today</h2>
+              <span className="sub">Most urgent first</span>
+            </div>
+            {today.length === 0 ? (
+              <p>All clear. Every app passes its checks and nothing expires in the next 30 days. Check back next week.</p>
+            ) : (
+              <div className="stack">
+                {today.map((t) => (
+                  <div key={t.text} className={`today today-${t.tone}`}>
+                    <p>{t.text}</p>
+                    {t.btn && <div><button className="btn sm" onClick={t.btn.run}>{t.btn.label}</button></div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
           <div className="statline">
-            <div><span className="n">{tenants.length}</span><span className="l">Tenants</span></div>
-            <div><span className="n">{apps.length}</span><span className="l">Integrations</span></div>
-            <div><span className="n" style={{ color: attention.some((s) => s.sev === "critical") ? "var(--crit)" : undefined }}>{scored.filter((s) => s.sev === "critical").length}</span><span className="l">With problems</span></div>
-            <div><span className="n" style={{ color: expiries.some((e) => e.days <= 30) ? "var(--warn)" : undefined }}>{expiries.filter((e) => e.days <= 30).length}</span><span className="l">Credentials expiring ≤ 30 days</span></div>
+            <div><span className="n">{tenants.length}</span><span className="l">Tenants (directories)</span></div>
+            <div><span className="n">{apps.length}</span><span className="l">Apps connected</span></div>
+            <div><span className="n" style={{ color: critical.length ? "var(--crit)" : undefined }}>{critical.length}</span><span className="l">Apps with problems</span></div>
+            <div><span className="n" style={{ color: soon.length ? "var(--warn)" : undefined }}>{soon.length}</span><span className="l">Expiring within 30 days</span></div>
           </div>
+
+          <details className="panel" open={!welcomeHidden}>
+            <summary><strong>What do these words mean?</strong></summary>
+            <dl className="kv glance">
+              <dt>Tenant</dt><dd>Your company's directory: the one place that knows every user and lets them sign in, usually Microsoft Entra ID. Big companies often have a production tenant and one or more test tenants.</dd>
+              <dt>App (integration)</dt><dd>One app that trusts your directory for sign-in (SAML or OIDC), API access (OAuth) or user accounts (SCIM). The same app in test and production counts twice.</dd>
+              <dt><Sev s="critical" /></dt><dd>Something is set up wrong in a way that will probably stop people signing in, or already has.</dd>
+              <dt><Sev s="warn" /></dt><dd>Works today, but is risky or will break later, for example a certificate that expires soon.</dd>
+              <dt>Certificate or secret</dt><dd>A long password-like value an app and your directory use to prove messages are genuine. They expire on a fixed date, and when one does, sign-in to that app stops for everyone until it's renewed.</dd>
+            </dl>
+          </details>
 
           <div className="grid-2">
             <section className="panel">
               <div className="panel-head">
                 <h2>Needs attention</h2>
-                <span className="sub">{attention.length} integration{attention.length === 1 ? "" : "s"}</span>
+                <span className="sub">{attention.length} app{attention.length === 1 ? "" : "s"}</span>
               </div>
+              <p className="small muted">Apps whose setup has a problem or a warning. Click one to see every check and the playbook that fixes it.</p>
               {attention.length === 0 ? (
                 <p className="muted">Nothing flagged. Every integration passes its configuration checks.</p>
               ) : (
@@ -87,6 +158,7 @@ export default function Overview() {
                 <h2>Upcoming expirations</h2>
                 <span className="sub">Next 180 days</span>
               </div>
+              <p className="small muted">When a certificate or secret expires, sign-in to that app stops. Renew anything under 30 days with the app's owner now.</p>
               {expiries.length === 0 ? (
                 <p className="muted">No certificates or secrets expire in the next 180 days (based on dates recorded in the inventory).</p>
               ) : (
@@ -111,14 +183,14 @@ export default function Overview() {
 
           <section className="panel">
             <div className="panel-head">
-              <h2>Coverage by tenant</h2>
-              <span className="sub">Integrations per protocol</span>
+              <h2>Apps per tenant</h2>
+              <span className="sub">How many of each kind every directory has</span>
             </div>
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Tenant</th><th>Platform</th><th>Env</th>
+                    <th>Tenant</th><th>Platform</th><th>Environment</th>
                     {PROTOCOLS.map((p) => <th key={p.id} className="num">{p.short}{p.status === "planned" ? " (planned)" : ""}</th>)}
                     <th>Health</th>
                   </tr>
@@ -143,24 +215,6 @@ export default function Overview() {
         </>
       )}
 
-      <section className="panel">
-        <div className="panel-head">
-          <h2>New to this? Start here</h2>
-          <span className="sub">About an hour, in order</span>
-        </div>
-        <div className="grid-3">
-          {[
-            { t: "1. Learn the flows", d: "See how SAML, OIDC and OAuth messages move between browser, app and identity provider.", r: "learn" },
-            { t: "2. Decode the examples", d: "Load the sample SAML responses and tokens. Read every finding and open its playbook.", r: "saml" },
-            { t: "3. Walk a wizard", d: "Follow the Entra SAML wizard with a test app, then save it to the inventory.", r: "wizards" },
-          ].map((c) => (
-            <button key={c.r} className="panel card-btn" onClick={() => go(c.r)}>
-              <h3>{c.t}</h3>
-              <span className="muted small">{c.d}</span>
-            </button>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

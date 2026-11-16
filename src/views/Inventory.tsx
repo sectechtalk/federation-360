@@ -1,12 +1,14 @@
 import { Fragment, useState } from "react";
 import { useApp, ProtoChip, Sev, Field, FindingList, copyText } from "../components/ui";
-import { appHealth, worst } from "../lib/health";
+import { appHealth, daysUntil, worst } from "../lib/health";
 import { PROTOCOLS } from "../lib/protocols";
 import {
-  emptyOidc, emptySaml, ENV_LABEL, newId, PLATFORM_LABEL,
-  type AppIntegration, type Environment, type Platform, type Tenant,
+  emptyOidc, emptySaml, emptyScim, ENV_LABEL, newId, PLATFORM_LABEL,
+  type AppIntegration, type DiscoveryInfo, type Environment, type Platform, type Tenant,
 } from "../lib/types";
 import { wellKnownUrls } from "../lib/metadata";
+import { assertNoSecretMaterial, buildCredentialsExport } from "../lib/credentialExport";
+import { usePref } from "../lib/store";
 
 const envOpts = Object.keys(ENV_LABEL) as Environment[];
 const platOpts = Object.keys(PLATFORM_LABEL) as Platform[];
@@ -61,6 +63,73 @@ function TenantEditor({ initial, onClose }: { initial: Tenant; onClose: () => vo
   );
 }
 
+function entraLinks(d: DiscoveryInfo) {
+  const links: { label: string; url: string }[] = [];
+  if (d.objectId && d.appId) links.push({ label: "App registration", url: `https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/Overview/appId/${d.appId}` });
+  if (d.servicePrincipalId && d.appId) links.push({ label: "Enterprise application", url: `https://entra.microsoft.com/#view/Microsoft_AAD_IAM/ManagedAppMenuBlade/~/Overview/objectId/${d.servicePrincipalId}/appId/${d.appId}` });
+  return links;
+}
+
+/** Read-only facts from the last tenant scan. */
+function DiscoveryPanel({ d }: { d: DiscoveryInfo }) {
+  const links = d.provider === "entra" ? entraLinks(d) : [];
+  return (
+    <fieldset className="panel stack" style={{ margin: 0 }}>
+      <legend className="eyebrow">From the tenant · last scanned {d.lastSeen.slice(0, 10)}</legend>
+      {d.missing && <div className="callout warn">The last scan of this tenant didn't find this app. If it was deleted on purpose, delete this entry.</div>}
+      <dl className="kv">
+        {d.appId && <><dt>Application (client) ID</dt><dd>{d.appId}</dd></>}
+        {d.objectId && <><dt>App object ID</dt><dd>{d.objectId}</dd></>}
+        {d.servicePrincipalId && <><dt>Service principal ID</dt><dd>{d.servicePrincipalId}</dd></>}
+        <dt>Sign-in</dt><dd>{d.servicePrincipalId ? (d.enabled ? "Enabled" : "Disabled") : "No enterprise app yet (nobody can sign in)"}</dd>
+        {d.thirdParty && <><dt>Registered by</dt><dd>{d.publisher ?? "Another organization"} (third-party app)</dd></>}
+        {d.signInAudience && <><dt>Who can sign in</dt><dd>{d.signInAudience}</dd></>}
+        {d.ssoMode && <><dt>SSO mode</dt><dd>{d.ssoMode}</dd></>}
+        <dt>Owners</dt><dd>{d.owners.length ? d.owners.join(", ") : "None"}</dd>
+        {d.identifierUris.length > 0 && <><dt>Identifier URIs</dt><dd>{d.identifierUris.join(" · ")}</dd></>}
+        {d.redirectUris.length > 0 && <><dt>Redirect URIs</dt><dd>{d.redirectUris.map((r) => <div key={r.type + r.uri}>{r.uri} <span className="tag">{r.type}</span></div>)}</dd></>}
+        {(d.implicit.idToken || d.implicit.accessToken) && <><dt>Implicit grant</dt><dd>{[d.implicit.idToken && "ID tokens", d.implicit.accessToken && "access tokens"].filter(Boolean).join(" and ")} enabled</dd></>}
+      </dl>
+      {d.credentials.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Credential</th><th>Type</th><th>On</th><th>Expires</th></tr></thead>
+            <tbody>
+              {d.credentials.map((c) => {
+                const left = daysUntil(c.end.slice(0, 10));
+                return (
+                  <tr key={c.on + c.keyId}>
+                    <td>{c.name}{c.thumbprint && <div className="small mono">{c.thumbprint}</div>}</td>
+                    <td>{c.kind}{c.usage ? ` (${c.usage})` : ""}</td>
+                    <td className="small">{c.on === "application" ? "App registration" : "Enterprise app"}</td>
+                    <td style={{ color: left < 0 ? "var(--crit)" : left <= 30 ? "var(--warn)" : undefined }}>{c.end.slice(0, 10)}{Number.isFinite(left) && <div className="small">{left < 0 ? `${-left} days ago` : `in ${left} days`}</div>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {d.permissions.length > 0 && (
+        <details>
+          <summary>Permissions ({d.permissions.filter((p) => p.status === "granted").length} granted, {d.permissions.filter((p) => p.status === "requested").length} requested)</summary>
+          <div className="table-wrap" style={{ marginTop: 8 }}>
+            <table>
+              <thead><tr><th>API</th><th>Permission</th><th>Type</th><th>Status</th></tr></thead>
+              <tbody>
+                {d.permissions.map((p, i) => (
+                  <tr key={i}><td>{p.resource}</td><td className="mono">{p.value}</td><td>{p.type}</td><td>{p.status}{p.consent === "AllPrincipals" ? " (admin, all users)" : p.consent === "Principal" ? " (one user)" : ""}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+      {links.length > 0 && <div className="row">{links.map((l) => <a key={l.url} className="btn sm" href={l.url} target="_blank" rel="noreferrer">Open {l.label} in Entra ↗</a>)}</div>}
+    </fieldset>
+  );
+}
+
 function AppEditor({ initial, onClose }: { initial: AppIntegration; onClose: () => void }) {
   const { store, toast, tenants, go } = useApp();
   const [a, setA] = useState<AppIntegration>(initial);
@@ -68,6 +137,8 @@ function AppEditor({ initial, onClose }: { initial: AppIntegration; onClose: () 
   const set = (k: keyof AppIntegration, v: any) => setA({ ...a, [k]: v });
   const ss = (k: keyof AppIntegration["saml"], v: string) => setA({ ...a, saml: { ...a.saml, [k]: v } });
   const so = (k: keyof AppIntegration["oidc"], v: string) => setA({ ...a, oidc: { ...a.oidc, [k]: v } });
+  const scim = a.scim ?? emptyScim();
+  const sc = (k: keyof NonNullable<AppIntegration["scim"]>, v: string) => setA({ ...a, scim: { ...scim, [k]: v } });
   const isNew = !initial.name;
   const save = async () => {
     if (!a.name.trim()) return toast("Give the integration a name");
@@ -96,6 +167,7 @@ function AppEditor({ initial, onClose }: { initial: AppIntegration; onClose: () 
             {a.protocol === "saml" && <button className="btn sm" onClick={() => go("saml", { app: a.id })}>Decode a SAML message for this app</button>}
             {(a.protocol === "oidc" || a.protocol === "oauth") && <button className="btn sm" onClick={() => go("jwt", { app: a.id })}>Decode a token for this app</button>}
             <button className="btn sm" onClick={() => go("metadata", { tenant: a.tenantId })}>Check the IdP's metadata</button>
+            {a.provisioning === "scim" && <button className="btn sm" onClick={() => go("scim", { app: a.id })}>Check a SCIM message for this app</button>}
           </div>
         )}
         {!isNew && findings.length > 0 && <FindingList findings={findings} />}
@@ -111,13 +183,13 @@ function AppEditor({ initial, onClose }: { initial: AppIntegration; onClose: () 
           <label className="field" htmlFor="a-proto">
             <span>Protocol</span>
             <select id="a-proto" className="input" value={a.protocol} onChange={(e) => set("protocol", e.target.value)}>
-              {PROTOCOLS.map((p) => <option key={p.id} value={p.id} disabled={p.status === "planned"}>{p.name}{p.status === "planned" ? " (coming soon)" : ""}</option>)}
+              {PROTOCOLS.filter((p) => p.id !== "scim").map((p) => <option key={p.id} value={p.id} disabled={p.status === "planned"}>{p.name}{p.status === "planned" ? " (coming soon)" : ""}</option>)}
             </select>
           </label>
           <Field id="a-env" label="Environment" value={a.environment} onChange={(v) => set("environment", v)} options={envOpts} />
           <Field id="a-status" label="Status" value={a.status} onChange={(v) => set("status", v)} options={["live", "testing", "planned", "broken"]} />
           <Field id="a-owner" label="Owner" value={a.owner} onChange={(v) => set("owner", v)} placeholder="Team or person accountable" />
-          <Field id="a-prov" label="Provisioning" value={a.provisioning} onChange={(v) => set("provisioning", v)} options={["none", "scim", "jit", "manual"]} hint="How accounts get created in the app." />
+          <Field id="a-prov" label="Provisioning" value={a.provisioning} onChange={(v) => set("provisioning", v)} options={["none", "scim", "jit", "manual"]} hint="How accounts get created in the app. SCIM is set here, alongside the sign-in protocol." />
         </div>
 
         {a.protocol === "saml" && (
@@ -151,6 +223,20 @@ function AppEditor({ initial, onClose }: { initial: AppIntegration; onClose: () 
             {a.oidc.clientType === "confidential" && <Field id="o-se" label="Secret / certificate expires" type="date" value={a.oidc.secretExpires} onChange={(v) => so("secretExpires", v)} />}
           </fieldset>
         )}
+
+        {a.provisioning === "scim" && (
+          <fieldset className="panel stack" style={{ margin: 0 }}>
+            <legend className="eyebrow">SCIM provisioning</legend>
+            <Field id="c-url" label="SCIM endpoint (Tenant URL)" value={scim.endpoint} onChange={(v) => sc("endpoint", v)} placeholder="https://app.example.com/scim/v2" hint="The base URL Entra calls. /Users and /Groups are added to it." />
+            <div className="grid-2">
+              <Field id="c-exp" label="SCIM token expires" type="date" value={scim.tokenExpires} onChange={(v) => sc("tokenExpires", v)} hint="Record the date only. Never store the token here." />
+              <Field id="c-match" label="Matching attribute" value={scim.matchAttribute} onChange={(v) => sc("matchAttribute", v)} options={["userName", "externalId", "emails[type eq \"work\"].value"]} hint="What Entra searches on to find an existing account." />
+            </div>
+            <Field id="c-src" label="userName comes from" value={scim.userNameSource} onChange={(v) => sc("userNameSource", v)} placeholder="userPrincipalName" hint={a.protocol === "saml" ? `Should be the same source as the SAML NameID (${a.saml.nameIdSource || "not recorded"}).` : "Should be the same value the app matches on at sign-in."} />
+          </fieldset>
+        )}
+
+        {a.discovery && <DiscoveryPanel d={a.discovery} />}
 
         <Field id="a-notes" label="Notes" value={a.notes} onChange={(v) => set("notes", v)} multiline />
 
@@ -206,8 +292,62 @@ function ImportExport({ onClose }: { onClose: () => void }) {
   );
 }
 
+function CredentialsExport({ onClose }: { onClose: () => void }) {
+  const { tenants, apps, toast } = useApp();
+  // Remembered, so reopening the drawer (or reloading) doesn't silently drop the example apps and leave nothing to export.
+  const [withExamples, setWithExamples] = usePref("credx-examples", false);
+  const [saved, setSaved] = useState<string | null>(null);
+  const doc = buildCredentialsExport(tenants, apps, { includeExamples: withExamples });
+  const fileName = `f360-credentials-${doc.generatedAt.slice(0, 10)}.json`;
+  assertNoSecretMaterial(doc);
+  const json = JSON.stringify(doc, null, 2);
+  const hasExamples = apps.some((a) => a.example);
+  const download = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    a.download = fileName;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    setSaved(fileName);
+    toast(`Saved ${doc.counts.total} credentials to ${fileName}`);
+  };
+  return (
+    <div className="drawer-bg" onClick={onClose}>
+      <div className="drawer" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Export credentials">
+        <div className="spread"><h2>Export credentials for c-360</h2><button className="btn ghost" onClick={onClose}>Close</button></div>
+        <p className="muted">Every federation credential in this inventory: app client secrets and certificates, SAML signing certificates and SCIM tokens, with their expiry dates. Names, IDs, thumbprints and dates only. No secret values are ever included.</p>
+        <p className="small">
+          <strong>{doc.counts.total}</strong> credentials: {doc.counts.expired} expired, {doc.counts.expiring} expiring within {doc.expiringDays} days, {doc.counts.ok} fine, {doc.counts.unknown} with no expiry recorded.
+        </p>
+        {hasExamples && (
+          <label className="row small"><input type="checkbox" checked={withExamples} onChange={(e) => setWithExamples(e.target.checked)} /> Include the fictional example apps (marked <code>"example": true</code>)</label>
+        )}
+        <div className="row">
+          {/* Never disabled: you can download again as often as you like, and an empty file is still a valid export. */}
+          <button className="btn primary" onClick={download}>Download credentials file</button>
+          <button className="btn" onClick={() => copyText(json, toast)}>Copy JSON</button>
+        </div>
+        {saved && (
+          <div className="callout" role="status">
+            Saved <span className="mono">{saved}</span> to your browser's downloads folder, normally <span className="mono">C:\Users\&lt;you&gt;\Downloads</span>.
+            Press <span className="mono">Ctrl+J</span> in the browser to see it in the downloads list. Download again any time.
+          </div>
+        )}
+        {!doc.counts.total && (
+          <div className="callout warn" role="status">
+            {hasExamples && !withExamples
+              ? <>The file will be empty: the only credentials in this inventory belong to the fictional example apps, and those are left out. Tick <strong>Include the fictional example apps</strong> above to put them in.</>
+              : <>The file will be empty: this inventory has no credentials yet. Run Discover against a tenant, or record expiry dates on your integrations.</>}
+          </div>
+        )}
+        <details><summary>Preview</summary><pre className="small mono" style={{ maxHeight: 320, overflow: "auto" }}>{json}</pre></details>
+      </div>
+    </div>
+  );
+}
+
 export default function Inventory() {
-  const { tenants, apps, params, loading, loadExamples, store, toast } = useApp();
+  const { tenants, apps, params, loading, loadExamples, store, toast, go } = useApp();
   const [tenantFilter, setTenantFilter] = useState(params.tenant ?? "");
   const [q, setQ] = useState("");
   const [editingApp, setEditingApp] = useState<AppIntegration | null>(() => (params.app ? apps.find((a) => a.id === params.app) ?? null : null));
@@ -215,6 +355,7 @@ export default function Inventory() {
     params.add === "tenant" ? { id: newId(), name: "", platform: "entra", tenantRef: "", domain: "", environment: "prod", notes: "", updatedAt: "" } : null,
   );
   const [io, setIo] = useState(false);
+  const [credx, setCredx] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
 
   const shown = apps.filter((a) => (!tenantFilter || a.tenantId === tenantFilter) && (!q || (a.name + a.owner + a.saml.entityId + a.oidc.clientId).toLowerCase().includes(q.toLowerCase())));
@@ -234,7 +375,9 @@ export default function Inventory() {
           <p>Every tenant and every app integration, with the values you need when something breaks: identifiers, URLs, certificate and secret expiry, and an owner.</p>
         </div>
         <div className="row">
+          <button className="btn" onClick={() => go("discover")}>Discover from tenant</button>
           <button className="btn" onClick={() => setIo(true)}>Back up / import</button>
+          <button className="btn" onClick={() => setCredx(true)}>Export credentials</button>
           <button className="btn" onClick={() => setEditingTenant({ id: newId(), name: "", platform: "entra", tenantRef: "", domain: "", environment: "prod", notes: "", updatedAt: "" })}>Add tenant</button>
           <button className="btn primary" disabled={!tenants.length} onClick={() => setEditingApp(blankApp(tenantFilter || tenants[0]?.id || ""))}>Add integration</button>
         </div>
@@ -254,12 +397,12 @@ export default function Inventory() {
         {loading ? <p className="muted">Loading…</p> : tenants.length === 0 ? (
           <div className="empty">
             <p>No tenants yet. A tenant is one identity provider instance: an Entra tenant, an AWS IAM Identity Center instance, an Okta org.</p>
-            <button className="btn" onClick={loadExamples}>Load example data</button>
+            <div className="row"><button className="btn primary" onClick={() => go("discover")}>Discover from your tenant</button><button className="btn" onClick={loadExamples}>Load example data</button></div>
           </div>
         ) : (
           <div className="grid-3">
             {tenants.map((t) => (
-              <button key={t.id} className="panel card-btn" style={{ padding: 12, borderColor: tenantFilter === t.id ? "var(--accent)" : undefined }} onClick={() => setEditingTenant(t)}>
+              <button key={t.id} className="panel card-btn" style={{ padding: 12, ...(tenantFilter === t.id ? { background: "var(--btn-hover-bg)", borderColor: "var(--accent-strong)" } : {}) }} onClick={() => setEditingTenant(t)}>
                 <div className="spread"><strong>{t.name}</strong>{t.example && <span className="example-flag">Example</span>}</div>
                 <span className="small muted">{PLATFORM_LABEL[t.platform]} · {ENV_LABEL[t.environment]}</span>
                 <span className="small mono" style={{ overflowWrap: "anywhere" }}>{t.tenantRef || "no ID recorded"}</span>
@@ -289,7 +432,7 @@ export default function Inventory() {
                 const h = appHealth(a);
                 return (
                   <tr key={a.id} className="clickable" onClick={() => setEditingApp(a)}>
-                    <td><strong>{a.name}</strong>{a.example && <> <span className="example-flag">Example</span></>}</td>
+                    <td><strong>{a.name}</strong>{a.example && <> <span className="example-flag">Example</span></>}{a.discovery && <> <span className="tag" title={`Last scanned ${a.discovery.lastSeen.slice(0, 10)}`}>{a.discovery.missing ? "Not found in last scan" : "From tenant"}</span></>}</td>
                     <td><ProtoChip p={a.protocol} />{a.provisioning === "scim" && <> <span className="chip proto-scim">SCIM</span></>}</td>
                     <td>{tenantName(a.tenantId)}</td>
                     <td>{a.environment}</td>
@@ -309,6 +452,7 @@ export default function Inventory() {
       {editingApp && <AppEditor initial={editingApp} onClose={() => setEditingApp(null)} />}
       {editingTenant && <TenantEditor initial={editingTenant} onClose={() => setEditingTenant(null)} />}
       {io && <ImportExport onClose={() => setIo(false)} />}
+      {credx && <CredentialsExport onClose={() => setCredx(false)} />}
     </div>
   );
 }

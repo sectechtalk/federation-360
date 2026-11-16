@@ -52,8 +52,8 @@ export const PROTOCOLS: ProtocolModule[] = [
     short: "SCIM",
     purpose: "Provisioning: creating, updating and removing users and groups in apps.",
     answers: "Does the user's account exist in the app, with the right groups?",
-    status: "planned",
-    tools: [],
+    status: "available",
+    tools: ["scim"],
   },
 ];
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp, ProtoChip, Field, CodeBlock } from "../components/ui";
 import { WIZARDS, type Wizard } from "../data/wizards";
 import { usePref } from "../lib/store";
@@ -30,7 +30,7 @@ function Runner({ w, onExit }: { w: Wizard; onExit: () => void }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <button className="btn ghost sm" style={{ paddingLeft: 0 }} onClick={onExit}>← All wizards</button>
+          <button className="btn ghost sm" onClick={onExit}>← All wizards</button>
           <h1>{w.title}</h1>
           <p>{w.summary}</p>
         </div>
@@ -120,7 +120,12 @@ function Runner({ w, onExit }: { w: Wizard; onExit: () => void }) {
 }
 
 export default function Wizards() {
+  const { params } = useApp();
   const [active, setActive] = usePref<string>("wizard-active", "");
+  // Other pages can open one wizard directly: go("wizards", { id: "entra-saml" }).
+  useEffect(() => {
+    if (params.id && params.id !== active && WIZARDS.some((x) => x.id === params.id)) setActive(params.id);
+  }, [params.id]);
   const w = WIZARDS.find((x) => x.id === active);
   if (w) return <Runner w={w} onExit={() => setActive("")} />;
   return (

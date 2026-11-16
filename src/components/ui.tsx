@@ -49,7 +49,7 @@ export function FindingList({ findings }: { findings: Finding[] }) {
             {f.detail && <div className="detail">{f.detail}</div>}
             {f.playbook && (
               <div>
-                <button className="btn sm ghost" style={{ paddingLeft: 0 }} onClick={() => go("playbooks", { id: f.playbook! })}>
+                <button className="btn sm ghost" onClick={() => go("playbooks", { id: f.playbook! })}>
                   Open the playbook →
                 </button>
               </div>
@@ -237,7 +237,10 @@ export const Icon = {
   wizards: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 19 19 5M14 5h5v5" /><circle cx="6" cy="6" r="1.5" /><circle cx="18" cy="18" r="1.5" /></svg>,
   saml: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m8 7-5 5 5 5M16 7l5 5-5 5" /></svg>,
   jwt: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="8" cy="12" r="4" /><path d="M12 12h9M18 12v3M21 12v2" /></svg>,
+  scim: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="8" cy="8" r="3.2" /><path d="M2.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" /><path d="M15 8h6m-2.5-2.5L21 8l-2.500 2.500M21 15h-6m2.500-2.500L15 15l2.500 2.500" /></svg>,
   metadata: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 3 4 7v5c0 5 3.5 8 8 9 4.5-1 8-4 8-9V7z" /><path d="m9 12 2 2 4-4" /></svg>,
   playbooks: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z" /><path d="M5 17a3 3 0 0 1 3-3h11" /></svg>,
+  lab: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3" /><path d="M7.5 15h9" /></svg>,
+  discover: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2M8.5 11h5M11 8.5v5" /></svg>,
   learn: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m2 9 10-5 10 5-10 5z" /><path d="M6 11v5c3 2 9 2 12 0v-5" /></svg>,
 };

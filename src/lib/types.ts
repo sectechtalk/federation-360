@@ -45,6 +45,17 @@ export interface OidcSettings {
   secretExpires: string;
 }
 
+export interface ScimSettings {
+  /** The app's SCIM base URL, called Tenant URL in Entra. */
+  endpoint: string;
+  /** ISO date the SCIM bearer token (Secret Token in Entra) expires. */
+  tokenExpires: string;
+  /** SCIM attribute the identity provider matches existing accounts on. */
+  matchAttribute: string;
+  /** Directory attribute provisioned into userName. Should equal what is sent at sign-in. */
+  userNameSource: string;
+}
+
 export interface AppIntegration {
   id: string;
   tenantId: string;
@@ -56,10 +67,18 @@ export interface AppIntegration {
   provisioning: "none" | "scim" | "jit" | "manual";
   saml: SamlSettings;
   oidc: OidcSettings;
+  /** Present when provisioning is "scim". Older saved entries don't have it. */
+  scim?: ScimSettings;
+  /** Present when the entry came from live tenant discovery. Read-only facts from the identity provider. */
+  discovery?: DiscoveryInfo;
   notes: string;
   example?: boolean;
   updatedAt: string;
 }
+
+// Discovery facts come from the shared collector package (also used by c-360).
+export type { DiscoveryProvider, DiscoveredCredential, DiscoveredPermission, DiscoveryInfo } from "@sectechtalk/f360-collector";
+import type { DiscoveryInfo } from "@sectechtalk/f360-collector";
 
 export type Severity = "ok" | "info" | "warn" | "critical";
 
@@ -102,6 +121,13 @@ export const emptyOidc = (): OidcSettings => ({
   audience: "",
   issuer: "",
   secretExpires: "",
+});
+
+export const emptyScim = (): ScimSettings => ({
+  endpoint: "",
+  tokenExpires: "",
+  matchAttribute: "userName",
+  userNameSource: "userPrincipalName",
 });
 
 export const newId = () =>

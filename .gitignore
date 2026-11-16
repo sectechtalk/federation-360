@@ -1,2 +1,14 @@
 node_modules
 dist
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+backend_override.tf
+lab/lab-values.json
+lab/scim/data/
+lab/scim/logs/
+lab/testapp/.local/
+lab/testapp/captures/
+connectivity/results/

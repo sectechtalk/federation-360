@@ -1,0 +1,4 @@
+tenant_id               = "00000000-0000-0000-0000-000000000000"
+tenant_name             = "Federation 360 lab"
+live_test_redirect_uris = ["http://localhost:5173/"]
+lab_user_upns           = ["lab.user1@yourlab.onmicrosoft.com", "lab.user2@yourlab.onmicrosoft.com"]

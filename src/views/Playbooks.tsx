@@ -3,7 +3,7 @@ import { useApp, ProtoChip } from "../components/ui";
 import { PLAYBOOKS, playbookById, type Playbook } from "../data/playbooks";
 import type { ProtocolId } from "../lib/types";
 
-const TOOL_LABEL: Record<string, string> = { saml: "SAML decoder", jwt: "JWT decoder", metadata: "Metadata checker", inventory: "Inventory", wizards: "Setup wizards" };
+const TOOL_LABEL: Record<string, string> = { saml: "SAML decoder", jwt: "JWT decoder", metadata: "Metadata checker", scim: "SCIM checker", inventory: "Inventory", wizards: "Setup wizards" };
 
 function Detail({ p, onBack }: { p: Playbook; onBack: () => void }) {
   const { go } = useApp();
@@ -11,7 +11,7 @@ function Detail({ p, onBack }: { p: Playbook; onBack: () => void }) {
     <div className="page">
       <div className="page-head">
         <div>
-          <button className="btn ghost sm" style={{ paddingLeft: 0 }} onClick={onBack}>← All playbooks</button>
+          <button className="btn ghost sm" onClick={onBack}>← All playbooks</button>
           <div className="row" style={{ marginBottom: 6 }}>
             {p.code && <span className="mono" style={{ fontWeight: 600 }}>{p.code}</span>}
             {p.protocols.map((x) => <ProtoChip key={x} p={x} />)}
@@ -56,7 +56,7 @@ function Detail({ p, onBack }: { p: Playbook; onBack: () => void }) {
 export default function Playbooks() {
   const { params } = useApp();
   const [q, setQ] = useState("");
-  const [proto, setProto] = useState<ProtocolId | "">("");
+  const [proto, setProto] = useState<ProtocolId | "">((params.proto as ProtocolId) ?? "");
   const [open, setOpen] = useState<string>(params.id ?? "");
   const current = open ? playbookById(open) : undefined;
   if (current) return <Detail p={current} onBack={() => setOpen("")} />;
@@ -71,7 +71,8 @@ export default function Playbooks() {
     { label: "Microsoft Entra ID errors (AADSTS)", items: list.filter((p) => p.code?.startsWith("AADSTS")) },
     { label: "SAML problems on the app side", items: list.filter((p) => !p.code && p.protocols.includes("saml") && !p.platforms.some((x) => x.startsWith("AWS")) && p.id !== "clock-skew" && p.id !== "groups-overage") },
     { label: "AWS", items: list.filter((p) => p.platforms.some((x) => x.startsWith("AWS"))) },
-    { label: "OAuth and OpenID Connect", items: list.filter((p) => !p.code && !p.protocols.includes("saml")) },
+    { label: "Provisioning (SCIM)", items: list.filter((p) => p.id.startsWith("scim-")) },
+    { label: "OAuth and OpenID Connect", items: list.filter((p) => !p.code && !p.protocols.includes("saml") && !p.id.startsWith("scim-")) },
     { label: "Any protocol", items: list.filter((p) => p.id === "clock-skew" || p.id === "groups-overage") },
   ];
 
@@ -84,12 +85,13 @@ export default function Playbooks() {
         </div>
       </div>
       <div className="row">
-        <input aria-label="Search playbooks" className="input" style={{ maxWidth: 360 }} placeholder="Search: 50011, audience, expired, consent…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+        <input aria-label="Search playbooks" className="input" style={{ maxWidth: 360 }} placeholder="Search: 50011, audience, expired, user not found…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
         <select aria-label="Protocol" className="input" style={{ width: 180 }} value={proto} onChange={(e) => setProto(e.target.value as any)}>
           <option value="">All protocols</option>
           <option value="saml">SAML</option>
           <option value="oidc">OpenID Connect</option>
           <option value="oauth">OAuth</option>
+          <option value="scim">SCIM</option>
         </select>
         <span className="small muted">{list.length} of {PLAYBOOKS.length}</span>
       </div>

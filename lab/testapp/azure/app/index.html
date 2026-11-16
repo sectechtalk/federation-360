@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F360 test app</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f7f8fa; --fg: #1b1f24; --muted: #5b6470; --card: #fff; --line: #d9dde3; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111418; --fg: #e8ebef; --muted: #9aa3ad; --card: #1a1f25; --line: #2c333b; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 640px; margin: 40px auto; padding: 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
+  code { font-size: 14px; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Federation 360 test app</h1>
+  <div class="card">
+    <p id="status">Checking…</p>
+    <p class="muted">This is the lab test app on Azure Static Web Apps (Free plan). It takes part in SAML, OpenID Connect and client credentials sign-ins against the Federation 360 lab tenant. Run the tests from Federation 360's Live test page.</p>
+    <p id="f360"></p>
+  </div>
+</main>
+<script>
+  fetch("/api/config").then((r) => r.json()).then((c) => {
+    document.getElementById("status").textContent = c.configured ? "Set up for lab tenant " + c.tenantId + "." : "Running, but not set up yet. Run lab/testapp/azure/Deploy-F360TestAppAzure.ps1.";
+    if (c.f360Url) {
+      const a = document.createElement("a");
+      a.href = c.f360Url + "/?testapp=" + encodeURIComponent(location.origin) + "#livetest";
+      a.textContent = "Open Live test in Federation 360";
+      document.getElementById("f360").appendChild(a);
+    }
+  }).catch(() => { document.getElementById("status").textContent = "The API isn't answering yet. Deployments take a minute or two to start."; });
+</script>
+</body>
+</html>

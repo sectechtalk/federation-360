@@ -84,6 +84,31 @@ export const FLOWS: Flow[] = [
     ],
     watch: ["Admin consent is required for application permissions.", "Track the secret/certificate expiry.", "403 = valid token but missing permission; 401 = token itself rejected."],
   },
+  {
+    id: "scim-lifecycle",
+    title: "SCIM provisioning: joiner, sign-in, leaver",
+    protocol: "scim",
+    actors: ["Entra provisioning", "App's SCIM API", "User signing in"],
+    intro: "Provisioning runs in the background on a schedule, with no user present. It decides whether an account exists in the app. Sign-in happens later and separately; it only works if the account SCIM created carries the same identifier that sign-in presents.",
+    steps: [
+      { from: 0, to: 0, label: "User assigned to the app", note: "Now in scope. Picked up on the next cycle (about every 40 minutes)" },
+      { from: 0, to: 1, label: "GET /Users?filter=userName eq …", note: "Does the account already exist? Bearer token in the header" },
+      { from: 1, to: 0, label: "200, totalResults: 0", note: "No match, so create" },
+      { from: 0, to: 1, label: "POST /Users", note: "userName, externalId, active: true, name, emails" },
+      { from: 1, to: 0, label: "201 Created + id", note: "Entra stores the app's id for later updates" },
+      { from: 2, to: 1, label: "Signs in with SAML or OIDC", note: "NameID or claim must equal userName" },
+      { from: 1, to: 2, label: "Account found, user is in", note: "No match here = “user not found”" },
+      { from: 0, to: 0, label: "User unassigned or disabled", note: "The leaver event" },
+      { from: 0, to: 1, label: "PATCH /Users/{id}", note: "replace active = false" },
+      { from: 1, to: 0, label: "204 or 200", note: "Account disabled in the app" },
+    ],
+    watch: [
+      "userName must equal the identifier the app receives at sign-in.",
+      "An expired SCIM token stops everything without any sign-in error.",
+      "The disable step is the one nobody tests. Test it.",
+      "Apps without SCIM create accounts at first sign-in and never remove them.",
+    ],
+  },
 ];
 
 export const GLOSSARY: { term: string; protocols: ProtocolId[]; def: string }[] = [
@@ -114,7 +139,16 @@ export const GLOSSARY: { term: string; protocols: ProtocolId[]; def: string }[] 
   { term: "Service principal / Enterprise application", protocols: ["saml", "oidc", "oauth"], def: "The app's instance in a tenant, where assignment, consent and Conditional Access apply. The app registration is the global definition." },
   { term: "Conditional Access", protocols: ["saml", "oidc", "oauth"], def: "Entra policies evaluated at sign-in (who, what app, where, which device) that grant, block, or require MFA or a compliant device." },
   { term: "Clock skew", protocols: ["saml", "oidc", "oauth"], def: "Difference between two systems' clocks. Validators allow a few minutes; beyond that, valid tokens look expired." },
-  { term: "SCIM", protocols: ["scim"], def: "System for Cross-domain Identity Management. A REST API standard for creating, updating and deleting users and groups in apps. Coming in a later module." },
+  { term: "SCIM", protocols: ["scim"], def: "System for Cross-domain Identity Management. A REST API standard for creating, updating and disabling users and groups in apps. It runs in the background, separately from sign-in." },
+  { term: "Provisioning / deprovisioning", protocols: ["scim"], def: "Creating an account in an app when someone needs it, and disabling or removing it when they don't. Also called joiner, mover, leaver." },
+  { term: "Tenant URL / Secret Token", protocols: ["scim"], def: "Entra's names for the app's SCIM base URL and the bearer token Entra uses to call it." },
+  { term: "userName", protocols: ["scim"], def: "The required sign-in name on a SCIM user. It must equal the identifier the app receives at sign-in, or the app can't find the account." },
+  { term: "externalId", protocols: ["scim"], def: "The identity provider's own ID for a user, stored in the app so a renamed user is still recognised as the same person." },
+  { term: "active", protocols: ["scim"], def: "true or false on a SCIM user. Setting it to false disables the account, which is how leavers lose access without deleting their data." },
+  { term: "Matching attribute", protocols: ["scim"], def: "The attribute Entra searches on before creating a user. A match links to the existing account; no match creates a new one." },
+  { term: "Scope (provisioning)", protocols: ["scim"], def: "Which users Entra sends to the app: only those assigned to it, or everyone. Different from an OAuth scope." },
+  { term: "Quarantine", protocols: ["scim"], def: "Entra's slow mode for a provisioning job whose calls keep failing. It retries about once a day until the cause is fixed and the job is restarted." },
+  { term: "PatchOp", protocols: ["scim"], def: "The SCIM message for a partial update: a list of add, replace and remove operations, each with a path and a value." },
   { term: "JIT provisioning", protocols: ["saml", "oidc"], def: "Just-in-time: the app creates the account on first sign-in from the assertion's attributes. Simple, but doesn't remove leavers." },
 ];
 
@@ -125,14 +159,4 @@ export const METHOD = [
   { title: "Capture the message", body: "Browser developer tools > Network > Preserve log. For SAML grab the SAMLRequest (redirect) and SAMLResponse (POST to the ACS). For OIDC grab the authorize URL and the tokens." },
   { title: "Decode and compare", body: "Use the decoders here with the app selected. They compare issuer, audience, ACS, time window and certificate against the inventory." },
   { title: "Change one thing, retest, record", body: "Fix the single mismatch, test in a private window, then update the inventory and note what happened. That record becomes your runbook." },
-];
-
-export const SKILLS_MAP = [
-  { skill: "Build and troubleshoot integrations using SAML, OpenID Connect, OAuth", where: "Wizards, SAML decoder, JWT decoder, Playbooks", route: "wizards" },
-  { skill: "Entra ID SSO, federation, MFA, Conditional Access", where: "Entra SAML and OIDC wizards; AADSTS playbooks for MFA and Conditional Access", route: "playbooks" },
-  { skill: "AWS workforce federation, IAM Identity Center, permission sets", where: "Entra to AWS IAM Identity Center wizard; AWS playbooks", route: "wizards" },
-  { skill: "Credential lifecycle for app identities and service accounts", where: "Inventory expiry tracking and the client credentials wizard", route: "inventory" },
-  { skill: "PowerShell / Python and REST APIs such as Microsoft Graph", where: "Generated PowerShell and Python in the client credentials wizard", route: "wizards" },
-  { skill: "Identity service reliability, root-cause resolution", where: "Troubleshooting method below and the playbooks", route: "playbooks" },
-  { skill: "SCIM provisioning and joiner/mover/leaver", where: "Next module (planned). AWS wizard already covers SCIM setup.", route: "learn" },
 ];

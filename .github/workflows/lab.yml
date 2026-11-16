@@ -1,0 +1,89 @@
+name: Lab tenant (Terraform)
+
+# Builds or removes the Federation 360 lab in YOUR lab tenant.
+# Sign-in is GitHub OIDC -> the f360-lab-deployer identity. No Entra secret is stored.
+#
+# Repository variables:  LAB_TENANT_ID, LAB_CLIENT_ID, LAB_USER_UPNS (JSON list), TF_CLOUD_ORGANIZATION
+# Optional variables:    LAB_REDIRECT_URIS (JSON list)
+#                        LAB_TESTAPP_CLOUD_ACS (reply URL of the test app on Azure; set by Deploy-F360TestAppAzure.ps1)
+# Repository secret:     TF_API_TOKEN (HCP Terraform free tier, stores the state)
+# Environment "lab":     add required reviewers to get an approval step before apply/destroy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [plan, apply, destroy]
+        default: plan
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency: lab-terraform
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: lab
+    defaults:
+      run:
+        working-directory: lab/terraform
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_TENANT_ID: ${{ vars.LAB_TENANT_ID }}
+      ARM_CLIENT_ID: ${{ vars.LAB_CLIENT_ID }}
+      TF_VAR_tenant_id: ${{ vars.LAB_TENANT_ID }}
+      TF_CLOUD_ORGANIZATION: ${{ vars.TF_CLOUD_ORGANIZATION }}
+      TF_WORKSPACE: f360-lab
+      TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+      TF_IN_AUTOMATION: "true"
+      LAB_USER_UPNS: ${{ vars.LAB_USER_UPNS }}
+      LAB_REDIRECT_URIS: ${{ vars.LAB_REDIRECT_URIS }}
+      LAB_TESTAPP_CLOUD_ACS: ${{ vars.LAB_TESTAPP_CLOUD_ACS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Configure state and variables
+        run: |
+          printf 'terraform {\n  cloud {}\n}\n' > backend_override.tf
+          if [ -n "$LAB_USER_UPNS" ]; then echo "TF_VAR_lab_user_upns=$LAB_USER_UPNS" >> "$GITHUB_ENV"; fi
+          if [ -n "$LAB_REDIRECT_URIS" ]; then echo "TF_VAR_live_test_redirect_uris=$LAB_REDIRECT_URIS" >> "$GITHUB_ENV"; fi
+          if [ -n "$LAB_TESTAPP_CLOUD_ACS" ]; then echo "TF_VAR_testapp_cloud_acs_url=$LAB_TESTAPP_CLOUD_ACS" >> "$GITHUB_ENV"; fi
+
+      - run: terraform init -input=false
+      - run: terraform validate
+
+      - name: Plan
+        if: inputs.action == 'plan'
+        run: terraform plan -input=false
+
+      - name: Apply
+        if: inputs.action == 'apply'
+        run: terraform apply -input=false -auto-approve
+
+      - name: Destroy
+        if: inputs.action == 'destroy'
+        run: terraform destroy -input=false -auto-approve
+
+      - name: Inventory for Federation 360
+        if: inputs.action == 'apply'
+        run: |
+          {
+            echo '### Import into Federation 360'
+            echo 'Copy this JSON into **Inventory > Back up / import**:'
+            echo '```json'
+            terraform output -raw f360_inventory
+            echo
+            echo '```'
+            echo "OIDC test: $(terraform output -raw oidc_playground_url)"
+            echo
+            echo "SAML test: $(terraform output -raw saml_test_url)"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '### End of lab outputs'

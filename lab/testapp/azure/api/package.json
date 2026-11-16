@@ -1,0 +1,6 @@
+{
+  "name": "f360-testapp-api",
+  "private": true,
+  "description": "Lab test app managed function. No dependencies on purpose.",
+  "type": "commonjs"
+}

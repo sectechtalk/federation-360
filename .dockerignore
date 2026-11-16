@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+lab/lab-values.json
+lab/scim/data
+lab/scim/logs
+lab.yml
+connectivity/results

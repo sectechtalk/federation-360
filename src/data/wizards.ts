@@ -1,4 +1,4 @@
-import { emptyOidc, emptySaml, type AppIntegration, type ProtocolId } from "../lib/types";
+import { emptyOidc, emptySaml, emptyScim, type AppIntegration, type ProtocolId } from "../lib/types";
 
 export interface WizardField {
   key: string;
@@ -327,6 +327,203 @@ Matching:        userPrincipalName -> userName (must equal SAML NameID)`,
       },
       notes: [v.scimTokenExpires ? `SCIM token expires ${v.scimTokenExpires}.` : "", v.permSets ? `Permission sets:\n${v.permSets}` : ""].filter(Boolean).join("\n"),
     }),
+  },
+  // ---------------------------------------------------------------
+  {
+    id: "entra-scim",
+    title: "SCIM provisioning from Entra ID to an app",
+    protocol: "scim",
+    platform: "Microsoft Entra ID",
+    summary: "Have Entra create, update and disable accounts in an app automatically, and make sure the provisioned account matches what the app receives at sign-in.",
+    minutes: 30,
+    youWillLearn: ["How provisioning (SCIM) and sign-in (SAML or OIDC) depend on one shared identifier", "What Tenant URL, Secret Token, matching and scope mean", "How to test one user before turning it on for everyone"],
+    steps: [
+      {
+        title: "Get the app's SCIM details",
+        explain:
+          "SCIM is a REST API that the app exposes. Entra is the client: it calls the app to create, update and disable users. From the app's admin console (usually under Security, SSO or Provisioning) you need two things: the SCIM base URL and a credential.",
+        fields: [
+          { key: "appName", label: "App name", placeholder: "Expense Portal", help: "The enterprise application this provisioning belongs to. Use the same app that already does single sign-on." },
+          {
+            key: "tenantUrl",
+            label: "SCIM base URL (Tenant URL)",
+            placeholder: "https://expenses.contoso.example/scim/v2",
+            help: "The root of the app's SCIM API. Entra adds /Users and /Groups to it.",
+            pitfall: "Including /Users in this URL, or leaving out /scim/v2, gives 404 on every request.",
+            validate: https,
+          },
+          { key: "auth", label: "How Entra authenticates", type: "select", options: ["Long-lived bearer token", "OAuth 2.0 client credentials"], help: "A bearer token is one secret string pasted into Entra. Client credentials is safer because tokens are short-lived and refreshed automatically; use it when the app supports it." },
+          { key: "tokenExpires", label: "Token or secret expiry date", type: "date", help: "When the credential stops working.", pitfall: "When it expires there is no sign-in error. Provisioning just stops: joiners get no account and leavers keep theirs." },
+        ],
+        why: "The credential lets Entra create and disable accounts in the app, so it is as sensitive as an admin password. Generate it with a service or break-glass admin account, not a personal one that will be offboarded.",
+      },
+      {
+        title: "Choose the one identifier both sides will use",
+        explain:
+          "This is the step that prevents “user not found”. At sign-in the app receives an identifier (the SAML NameID, or a claim such as preferred_username). SCIM writes the account's userName. The app can only connect a sign-in to an account when those two values are the same.",
+        fields: [
+          { key: "sso", label: "How users sign in to this app", type: "select", options: ["SAML", "OpenID Connect"], help: "The protocol the app already uses for single sign-on." },
+          { key: "signInSource", label: "Sign-in identifier comes from", placeholder: "user.userprincipalname", help: "SAML: the source of Unique User Identifier (Name ID) under Attributes & Claims. OIDC: the claim the app matches on." },
+          {
+            key: "userNameSource",
+            label: "SCIM userName comes from",
+            placeholder: "userPrincipalName",
+            help: "The directory attribute mapped to userName in the provisioning attribute mapping. Entra's default is userPrincipalName.",
+            pitfall: "If sign-in sends the UPN and userName is filled from mail, every user whose UPN and email differ is locked out of the app.",
+            validate: (v, all) => {
+              const n = (x: string) => x.toLowerCase().replace(/^user\./, "").trim();
+              return v && all.signInSource && n(v) !== n(all.signInSource) ? `Different from the sign-in source (${all.signInSource}). Use the same attribute for both unless you are certain the values are always equal.` : null;
+            },
+          },
+          { key: "matchAttribute", label: "Match existing accounts on", type: "select", options: ["userName", "externalId"], help: "Before creating anyone, Entra searches the app for this attribute. A match links to the existing account; no match creates a new one.", pitfall: "Matching on externalId when existing accounts have none makes Entra try to create duplicates (409 Conflict)." },
+        ],
+        why: "Sign-in and provisioning are configured on different screens and often by different people. Writing the shared identifier down once is what keeps them aligned.",
+      },
+      {
+        title: "Connect Entra to the app",
+        where: "Entra admin center > Entra ID > Enterprise apps > your app > Provisioning",
+        explain: "Give Entra the URL and credential, and prove they work before going further.",
+        actions: [
+          "Select New configuration (older tenants: Get started, then set Provisioning Mode to Automatic).",
+          "Paste the SCIM base URL into Tenant URL.",
+          "Paste the token into Secret Token. Paste the token only, without the word Bearer and without spaces.",
+          "Select Test connection. Entra calls the app and reports success or the HTTP error.",
+          "Select Create or Save.",
+        ],
+        fields: [
+          { key: "flag", label: "Send standard PATCH requests", type: "select", options: ["Yes, add ?aadOptscim062020 to the Tenant URL", "No, use Entra's default format"], help: "By default Entra sends op as Add/Replace/Remove and active as the text \"False\". The flag makes it send the standard lower-case ops and a real true/false.", pitfall: "Without the flag, strict apps answer 400, and some loose ones read \"False\" as true, so leavers stay enabled." },
+        ],
+        why: "Test connection only proves the URL and credential. It doesn't prove users will be created correctly; the on-demand test in step 6 does that.",
+      },
+      {
+        title: "Review the attribute mappings",
+        where: "Provisioning > Attribute mapping (or Mappings) > Provision Microsoft Entra ID Users",
+        explain: "Mappings decide what Entra writes into each SCIM attribute. Keep the list short: every extra attribute is another way for the app to reject a request.",
+        actions: [
+          "Confirm userName is mapped from the source you chose in step 2.",
+          "Open the mapping for your matching attribute and set “Match objects using this attribute” to Yes with precedence 1.",
+          "Leave the active mapping as it is. It turns a disabled or deleted Entra user into active = false, which is how leavers lose access.",
+          "Delete mappings for attributes the app doesn't support (check the vendor's SCIM documentation).",
+          "If the app compares userName case-sensitively, change the mapping to an expression: ToLower([userPrincipalName]).",
+          "If the app has no group feature, disable Provision Microsoft Entra ID Groups.",
+        ],
+        why: "Entra's defaults: userPrincipalName to userName, mail to emails[type eq \"work\"].value, mailNickname to externalId, and a Switch on IsSoftDeleted to active.",
+      },
+      {
+        title: "Set who gets an account",
+        where: "Provisioning > Settings > Scope, and the app's Users and groups page",
+        explain: "Scope decides which users Entra sends. Assignment is also what allows a user to sign in, so one assignment controls both gates.",
+        fields: [
+          { key: "scope", label: "Scope", type: "select", options: ["Sync only assigned users and groups", "Sync all users and groups"], help: "Assigned-only is the safe choice: an account exists in the app only for people you assigned." },
+          { key: "notify", label: "Failure notification email", placeholder: "identity-team@contoso.example", help: "Entra emails this address when the job goes into quarantine." },
+        ],
+        actions: [
+          "On Users and groups, assign one test user first.",
+          "Remember that members of nested groups are not provisioned, and that assigning groups needs Entra ID P1 or higher.",
+        ],
+        why: "“Sync all” creates an account, and may consume a paid licence in the app, for every user in the directory.",
+      },
+      {
+        title: "Test with one user",
+        where: "Provisioning > Provision on demand",
+        explain: "Provision on demand runs the whole process for a single user immediately and shows every step: import, scope check, match, and the action sent to the app.",
+        actions: [
+          "Select the test user and choose Provision.",
+          "Open the Perform action step and view its details. Copy the request and response into the SCIM checker.",
+          "In the SCIM checker, enter the identifier the app receives at sign-in and confirm the comparison shows an exact match on userName.",
+          "Sign in to the app as the test user in a private window.",
+          "Unassign the test user, provision on demand again, and confirm the app shows the account as inactive.",
+        ],
+        why: "Testing the leaver path now is the only way to know it works. Nobody reports an account that should have been disabled.",
+      },
+      {
+        title: "Turn it on and watch the first cycle",
+        where: "Provisioning > Start provisioning, then Provisioning logs",
+        explain: "The first cycle evaluates every user in scope and can take from minutes to hours. After that, incremental cycles run about every 40 minutes.",
+        actions: [
+          "Assign the real users or groups, then select Start provisioning.",
+          "In Provisioning logs, filter Status to Failure and Skipped. Open each distinct error once and look it up in Playbooks.",
+          "Put the credential's expiry date in your calendar and in the inventory entry this wizard creates.",
+        ],
+      },
+    ],
+    outputs: (v) => {
+      const flag = (v.flag ?? "Yes").startsWith("Yes");
+      const base = T(v, "tenantUrl");
+      const url = flag && v.tenantUrl ? `${v.tenantUrl.trim().replace(/\?.*$/, "")}?aadOptscim062020` : base;
+      const match = T(v, "matchAttribute", "userName");
+      const src = T(v, "userNameSource", "userPrincipalName");
+      return [
+        {
+          title: "Entra provisioning settings",
+          body: `Enterprise app:   ${T(v, "appName")}
+Provisioning mode: Automatic
+Tenant URL:       ${url}
+Authentication:   ${T(v, "auth", "Long-lived bearer token")}
+Secret Token:     (paste in Entra only; never store it here)
+Credential expiry: ${T(v, "tokenExpires", "(record it!)")}
+Scope:            ${T(v, "scope", "Sync only assigned users and groups")}
+Notify on failure: ${T(v, "notify", "(none)")}`,
+        },
+        {
+          title: "Identifier agreement",
+          body: `Sign-in (${T(v, "sso", "SAML")}) sends:  ${T(v, "signInSource", "user.userprincipalname")}
+SCIM userName from:     ${src}
+Match existing users on: ${match}  (precedence 1)
+
+These two sources must produce the same value for every user.`,
+        },
+        {
+          title: "Attribute mapping (minimum)",
+          body: `${src.padEnd(22)} -> userName
+Switch([IsSoftDeleted], , "False", "True", "True", "False") -> active
+mail                   -> emails[type eq "work"].value
+givenName              -> name.givenName
+surname                -> name.familyName
+mailNickname           -> externalId`,
+        },
+        {
+          title: "Check the endpoint yourself (PowerShell 7)",
+          body: `$base  = '${base.replace(/\?.*$/, "")}'
+$token = Read-Host -AsSecureString 'SCIM token (hidden)'
+$upn   = 'test.user@contoso.example'
+
+# 1. Is this a SCIM endpoint, and what does it support?
+Invoke-RestMethod "$base/ServiceProviderConfig" -Authentication Bearer -Token $token | ConvertTo-Json -Depth 5
+
+# 2. The same lookup Entra does before it creates a user
+$filter = [uri]::EscapeDataString("${match} eq \`"$upn\`"")
+Invoke-RestMethod "$base/Users?filter=$filter" -Authentication Bearer -Token $token | ConvertTo-Json -Depth 8`,
+        },
+      ];
+    },
+    testPlan: [
+      "Test connection succeeds.",
+      "Provision on demand creates the test user; the provisioning log shows Create with status Success.",
+      "SCIM checker shows an exact match between userName and the identifier sent at sign-in.",
+      "The test user signs in to the app and lands in their own account, not a new empty one.",
+      "Changing the user's job title in Entra reaches the app within one cycle (about 40 minutes).",
+      "Unassigning the user sets active to false in the app, and the user can no longer use it.",
+      "The credential's expiry date is recorded in the inventory and on a calendar.",
+    ],
+    toApp: (v) => {
+      const oidc = (v.sso ?? "SAML") === "OpenID Connect";
+      return {
+        name: v.appName || "SCIM app",
+        protocol: oidc ? "oidc" : "saml",
+        provisioning: "scim",
+        status: "testing",
+        saml: { ...emptySaml(), nameIdSource: oidc ? "" : v.signInSource || "user.userprincipalname" },
+        scim: {
+          ...emptyScim(),
+          endpoint: v.tenantUrl?.trim() || "",
+          tokenExpires: v.tokenExpires || "",
+          matchAttribute: v.matchAttribute || "userName",
+          userNameSource: v.userNameSource || "userPrincipalName",
+        },
+        notes: [`Provisioning scope: ${v.scope || "Sync only assigned users and groups"}.`, (v.flag ?? "Yes").startsWith("Yes") ? "Tenant URL uses ?aadOptscim062020 (standard PATCH)." : "", v.notify ? `Quarantine notifications go to ${v.notify}.` : ""].filter(Boolean).join("\n"),
+      };
+    },
   },
   // ---------------------------------------------------------------
   {
