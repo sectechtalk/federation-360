@@ -44,7 +44,7 @@ jobs:
       LAB_REDIRECT_URIS: ${{ vars.LAB_REDIRECT_URIS }}
       LAB_TESTAPP_CLOUD_ACS: ${{ vars.LAB_TESTAPP_CLOUD_ACS }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: hashicorp/setup-terraform@v3
         with:
