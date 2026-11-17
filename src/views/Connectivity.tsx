@@ -8,7 +8,7 @@ import {
   embedPlan,
   isTestableHost,
   parseResults,
-  r360Fields,
+  remediation360Fields,
   summarizeByTest,
   type DeviceReport,
   type ResultStatus,
@@ -52,7 +52,7 @@ export default function Connectivity() {
   const [name, setName] = useState("");
   const plan = useMemo(() => buildPlan(tenants, chosen, { name }), [tenants, chosen.map((a) => a.id).join(","), name]);
   const detect = useMemo(() => embedPlan(scriptTemplate, plan), [plan]);
-  const fields = r360Fields(plan);
+  const fields = remediation360Fields(plan);
   const planFile = `f360-plan-${plan.id}.json`;
 
   const [pasted, setPasted] = useState("");
@@ -175,7 +175,7 @@ explorer.exe "/select,$($f.FullName)"`;
           <button className="btn primary" disabled={!plan.tests.length} onClick={() => save(planFile, JSON.stringify(plan, null, 2), "application/json")}>Download {planFile}</button>
           <button className="btn" disabled={!plan.tests.length} onClick={() => copyText(JSON.stringify(plan, null, 2), toast)}>Copy plan JSON</button>
         </div>
-        <p className="small" style={{ margin: 0 }}>The file lands in your Downloads folder. Then paste this into PowerShell 7. It runs the script from your f-360 folder, prints a summary line and the full path of the result file, and opens File Explorer with that file selected. Drag the file onto the box in step 5, or use Choose files there.</p>
+        <p className="small" style={{ margin: 0 }}>The file lands in your Downloads folder. Then paste this into PowerShell 7. It runs the script from the folder you cloned Federation 360 into, prints a summary line and the full path of the result file, and opens File Explorer with that file selected. Drag the file onto the box in step 5, or use Choose files there.</p>
         <CodeBlock code={localRun} />
       </section>
 

@@ -38,7 +38,7 @@ const ROUTES = [
   { id: "lab", label: "Build your lab", group: "Learn", icon: "flask-conical", el: Lab },
 ] as const;
 
-// The page f-360 opens on when the address has no #page (or an unknown one).
+// The page Federation 360 opens on when the address has no #page (or an unknown one).
 const DEFAULT_ROUTE = "start";
 
 const routeFromHash = () => {

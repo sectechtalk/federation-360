@@ -1,10 +1,10 @@
 /**
- * Federation credentials export from the f-360 inventory.
+ * Federation credentials export (the expiry report) from the Federation 360 inventory.
  *
  * The contract (types, status rule, item IDs, Entra rotation links, schema, secret guard) lives in
- * the shared package @sectechtalk/f360-collector, which c-360 also uses to build the same document
- * straight from a scan. This module adds only what is f-360's own: items a person recorded
- * (SCIM tokens, hand-entered expiries) and the f-360 app ID and environment on every item.
+ * the shared package @sectechtalk/f360-collector, which certificates-360 also uses to build the same document
+ * straight from a scan. This module adds only what is Federation 360's own: items a person recorded
+ * (SCIM tokens, hand-entered expiries) and the Federation 360 app ID and environment on every item.
  * Schema: node_modules/@sectechtalk/f360-collector/schema/f360-federation-credentials.v1.schema.json
  */
 import {
@@ -33,7 +33,7 @@ export interface BuildOptions {
   generatorVersion?: string;
 }
 
-/** Every federation credential f-360 knows about, one item per credential. */
+/** Every federation credential Federation 360 knows about, one item per credential. */
 export function buildCredentialsExport(tenants: Tenant[], apps: AppIntegration[], opts: BuildOptions = {}): CredentialsExport {
   const now = opts.now ?? new Date();
   const items: CredentialItem[] = [];
@@ -107,5 +107,6 @@ export function buildCredentialsExport(tenants: Tenant[], apps: AppIntegration[]
     if (app.provisioning === "scim" && app.scim) rec("scim-token", "SCIM secret token", app.scim.tokenExpires);
   }
 
+  // "f-360" is a fixed value in the v1 format (generator.name), which certificates-360 reads. Keep it.
   return finishCredentialsExport(items, { name: "f-360", version: opts.generatorVersion ?? "0.1.0" }, now);
 }

@@ -40,7 +40,7 @@ It runs in your browser. Nothing you paste into it is sent anywhere.
 | Page | What it does |
 | --- | --- |
 | Overview | This week's health: what to do today, expired and expiring certificates and secrets, problems, coverage per tenant. |
-| Inventory | Every tenant and app integration: identifiers, URLs, certificate, secret and SCIM token expiry, owner. Back up and import as JSON. **Export credentials** writes a machine-readable list of every certificate and secret with its expiry ([format](docs/credentials-export.md)). |
+| Inventory | Every tenant and app integration: identifiers, URLs, certificate, secret and SCIM token expiry, owner. Back up and import as JSON. **Export expiry report** saves a list of every certificate and secret with its expiry date, never the secret values, for certificates-360 or any other tool ([format](docs/credentials-export.md)). |
 | Discover | Reads every SAML, OIDC and OAuth app in an Entra tenant through Microsoft Graph, read-only: certificates, secrets (names and dates only), redirect URIs, owners, permissions and consent. Merges it into Inventory without deleting anything. |
 | Setup wizards | Step-by-step setups that fill in the values for you: SAML app in Entra, Entra to AWS IAM Identity Center (SAML and SCIM), SCIM provisioning from Entra, OIDC sign-in with PKCE, OAuth client credentials (with PowerShell and Python). |
 

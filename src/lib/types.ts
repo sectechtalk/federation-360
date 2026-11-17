@@ -76,7 +76,7 @@ export interface AppIntegration {
   updatedAt: string;
 }
 
-// Discovery facts come from the shared collector package (also used by c-360).
+// Discovery facts come from the shared collector package (also used by certificates-360).
 export type { DiscoveryProvider, DiscoveredCredential, DiscoveredPermission, DiscoveryInfo } from "@sectechtalk/f360-collector";
 import type { DiscoveryInfo } from "@sectechtalk/f360-collector";
 

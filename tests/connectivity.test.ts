@@ -1,7 +1,7 @@
 // Agentless connectivity test: plan building, embedding the plan in the PowerShell script, and reading results back.
 import script from "../connectivity/Test-F360Connectivity.ps1?raw";
 import remediate from "../connectivity/Remediate-F360Connectivity.ps1?raw";
-import { buildPlan, embedPlan, extractPlan, isTestableHost, parseResults, parseSummaryLine, r360Fields, splitJson, summarizeByTest, PLAN_SCHEMA } from "../src/lib/connectivity";
+import { buildPlan, embedPlan, extractPlan, isTestableHost, parseResults, parseSummaryLine, remediation360Fields, splitJson, summarizeByTest, PLAN_SCHEMA } from "../src/lib/connectivity";
 import { emptyOidc, emptySaml, type AppIntegration, type Tenant } from "../src/lib/types";
 
 const TID = "8f2b6c1e-0d4a-4a7e-9a51-3c0d2e7b9f10";
@@ -112,8 +112,8 @@ describe("the PowerShell script", () => {
     for (const t of ["dns", "tcp", "tls", "http", "clock"]) expect(script).toContain(`'${t}'`);
   });
 
-  it("r360 form values fit the remediation schema limits", () => {
-    const f = r360Fields(buildPlan([tenant({})], [app({})], { now }));
+  it("Remediation 360 form values fit the remediation schema limits", () => {
+    const f = remediation360Fields(buildPlan([tenant({})], [app({})], { now }));
     expect(f.folder).toMatch(/^[A-Za-z0-9][A-Za-z0-9._-]*$/);
     expect(f.displayName.length).toBeGreaterThanOrEqual(3);
     expect(f.runRemediationScript).toBe(false);

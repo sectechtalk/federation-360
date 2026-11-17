@@ -1,4 +1,4 @@
-// Getting started (2026-11-16): a GETTING STARTED rail section above MANAGE, its page is what f-360 opens on, and every
+// Getting started (2026-11-16): a GETTING STARTED rail section above MANAGE, its page is what Federation 360 opens on, and every
 // step and situation points at a page that exists. Overview stays the health view and links here instead of repeating it.
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";

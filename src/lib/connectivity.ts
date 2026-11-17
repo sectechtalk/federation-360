@@ -248,11 +248,11 @@ export function extractPlan(script: string): ConnectivityPlan | null {
   }
 }
 
-/** The remediate.ps1 r360 needs alongside detect.ps1. It never runs ("Run remediation script" is off) and changes nothing. */
+/** The remediate.ps1 Remediation 360 needs alongside detect.ps1. It never runs ("Run remediation script" is off) and changes nothing. */
 export { default as REMEDIATE_SCRIPT } from "../../connectivity/Remediate-F360Connectivity.ps1?raw";
 
 /** Values for Remediation 360's New remediation form. The server picks the canary group itself. */
-export function r360Fields(plan: ConnectivityPlan) {
+export function remediation360Fields(plan: ConnectivityPlan) {
   return {
     folder: "f360-connectivity",
     displayName: "F360 Connectivity test",

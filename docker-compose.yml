@@ -1,4 +1,4 @@
-# Local development for f-360.
+# Local development for Federation 360.
 #   docker compose up --build              -> dev server with hot reload on http://localhost:5173
 #   docker compose --profile preview up --build preview
 #                                          -> production build on http://localhost:8080

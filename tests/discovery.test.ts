@@ -1,4 +1,4 @@
-// The Entra mapper's own tests live in @sectechtalk/f360-collector. These cover f-360's side:
+// The Entra mapper's own tests live in @sectechtalk/f360-collector. These cover Federation 360's side:
 // that the package is wired in, the inventory merge and the health checks.
 import { entraToSnapshot, makeSampleEntraExport } from "@sectechtalk/f360-collector";
 import { planMerge, applyMerge } from "../src/lib/discovery/merge";

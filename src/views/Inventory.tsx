@@ -309,13 +309,14 @@ function CredentialsExport({ onClose }: { onClose: () => void }) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     setSaved(fileName);
-    toast(`Saved ${doc.counts.total} credentials to ${fileName}`);
+    toast(`Saved the expiry report (${doc.counts.total} credentials) to ${fileName}`);
   };
   return (
     <div className="drawer-bg" onClick={onClose}>
-      <div className="drawer" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Export credentials">
-        <div className="spread"><h2>Export credentials for c-360</h2><button className="btn ghost" onClick={onClose}>Close</button></div>
-        <p className="muted">Every federation credential in this inventory: app client secrets and certificates, SAML signing certificates and SCIM tokens, with their expiry dates. Names, IDs, thumbprints and dates only. No secret values are ever included.</p>
+      <div className="drawer" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Export expiry report">
+        <div className="spread"><h2>Export expiry report for certificates-360</h2><button className="btn ghost" onClick={onClose}>Close</button></div>
+        <p className="muted">A list of every federation credential in this inventory and when it expires: app client secrets and certificates, SAML signing certificates and SCIM tokens. It holds names, IDs, certificate thumbprints and dates only. Secret values, private keys and tokens are never included, and the file is checked for them before it is saved.</p>
+        <p className="small">Keep the file internal: it lists your apps and which of their credentials expire when. Import it into certificates-360 for one view of every expiry.</p>
         <p className="small">
           <strong>{doc.counts.total}</strong> credentials: {doc.counts.expired} expired, {doc.counts.expiring} expiring within {doc.expiringDays} days, {doc.counts.ok} fine, {doc.counts.unknown} with no expiry recorded.
         </p>
@@ -324,7 +325,7 @@ function CredentialsExport({ onClose }: { onClose: () => void }) {
         )}
         <div className="row">
           {/* Never disabled: you can download again as often as you like, and an empty file is still a valid export. */}
-          <button className="btn primary" onClick={download}>Download credentials file</button>
+          <button className="btn primary" onClick={download}>Download expiry report</button>
           <button className="btn" onClick={() => copyText(json, toast)}>Copy JSON</button>
         </div>
         {saved && (
@@ -377,7 +378,7 @@ export default function Inventory() {
         <div className="row">
           <button className="btn" onClick={() => go("discover")}>Discover from tenant</button>
           <button className="btn" onClick={() => setIo(true)}>Back up / import</button>
-          <button className="btn" onClick={() => setCredx(true)}>Export credentials</button>
+          <button className="btn" onClick={() => setCredx(true)}>Export expiry report</button>
           <button className="btn" onClick={() => setEditingTenant({ id: newId(), name: "", platform: "entra", tenantRef: "", domain: "", environment: "prod", notes: "", updatedAt: "" })}>Add tenant</button>
           <button className="btn primary" disabled={!tenants.length} onClick={() => setEditingApp(blankApp(tenantFilter || tenants[0]?.id || ""))}>Add integration</button>
         </div>

@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { LIFECYCLES, SCENARIO, fillLab } from "../src/data/lifecycle";
+import { WORKDIR } from "../src/data/workdir";
 import { PLAYBOOKS } from "../src/data/playbooks";
 import { WIZARDS } from "../src/data/wizards";
 import * as learn from "../src/data/learn";
@@ -39,7 +40,7 @@ describe("lifecycle walkthrough", () => {
   it("PowerShell blocks start in the repo folder or set the tenant first", () => {
     for (const l of LIFECYCLES)
       for (const s of l.stages)
-        for (const st of s.steps) if (st.code) expect(st.code.body, st.title).toMatch(/^(cd \$HOME\\federation-360|\$TenantId = )/);
+        for (const st of s.steps) if (st.code) expect(st.code.body.startsWith(`cd ${WORKDIR}`) || st.code.body.startsWith("$TenantId = "), st.title).toBe(true);
   });
 
   it("fills in the lab tenant and domain, with clear placeholders when they're blank", () => {

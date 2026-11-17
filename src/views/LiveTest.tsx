@@ -159,7 +159,7 @@ export default function LiveTest() {
           </p>
           <CodeBlock code={START} />
           <p className="small muted" style={{ margin: 0 }}>
-            First time? The lab apps must exist first: merge the change, then run the lab workflow once (GitHub &gt; f-360 &gt; Actions &gt; lab &gt; Run workflow, action <span className="mono">apply</span>).
+            First time? The lab apps must exist first: merge the change, then run the lab workflow once (<span className="mono">./lab/Invoke-F360Lab.ps1 -Action apply</span>, or on GitHub: your repository &gt; Actions &gt; Lab tenant (Terraform) &gt; Run workflow, action <span className="mono">apply</span>).
           </p>
           <p className="small" style={{ margin: 0 }}>
             Or run it on Azure Static Web Apps (Free plan, $0) instead of Docker. This creates the site in your Azure subscription, copies the lab settings to it, and prints the address to use here:
