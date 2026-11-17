@@ -1,6 +1,6 @@
-// Getting started: the first page f-360 opens on. Written for someone who has only heard of SAML, OIDC or SCIM and has
+// Getting started: the first page Federation 360 opens on. Written for someone who has only heard of SAML, OIDC or SCIM and has
 // just been told "you own this" at a new company. Plain words, no assumed knowledge, and every step points at a page
-// f-360 already has. Overview shows today's health; this page is the path (first, next, ongoing). Keep them different.
+// Federation 360 already has. Overview shows today's health; this page is the path (first, next, ongoing). Keep them different.
 
 export interface Basics {
   id: "saml" | "oidc" | "scim";
@@ -65,7 +65,7 @@ export const START_STEPS: StartStep[] = [
     id: "learn",
     phase: "first",
     title: "Learn what SAML, OIDC, OAuth and SCIM actually do",
-    why: "Every page in f-360 uses a handful of words over and over. Twenty minutes on the Learn page makes the rest of f-360 readable.",
+    why: "Every page in Federation 360 uses a handful of words over and over. Twenty minutes on the Learn page makes the rest of Federation 360 readable.",
     how: "Read the four protocol cards and the one-sentence difference between sign-in and permission. Click through each flow under How the messages flow. Keep the Glossary at the bottom open when a word is new.",
     minutes: "20 min",
     open: { label: "Open Learn", route: "learn" },
@@ -184,7 +184,7 @@ export const SITUATIONS: Situation[] = [
   },
   {
     when: "Security asks for a list of every app and when its credentials expire",
-    do: "In Inventory, choose Export credentials. It saves a file with expiry dates only, never the secrets themselves.",
+    do: "In Inventory, choose Export expiry report. It saves a file with names and expiry dates only, never the secrets themselves.",
     open: { label: "Open Inventory", route: "inventory" },
   },
   {

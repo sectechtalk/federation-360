@@ -1,4 +1,4 @@
-/* 360-base.css: the shared look and feel for every 360 app (e-360, r-360, f-360, hm-360, c-360).
+/* 360-base.css: the shared look and feel for every 360 app (Entity 360, Remediation 360, HeatMap 360, Federation 360, Certificates 360).
    Copy this file unchanged into each app. App-specific styles go in the app's own stylesheet.
    Standard agreed 2026-11-15: one font (Inter), one seven-step type scale with a 12px floor,
    weights 400/500/600, shared neutral and status colours, one accent per app. */

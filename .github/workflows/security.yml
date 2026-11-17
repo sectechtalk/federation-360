@@ -13,7 +13,7 @@ permissions:
   pull-requests: read # gitleaks reads the PR's commit range
 jobs:
   dependency-audit:
-    # Fails on a high or critical advisory in any package, dev tools included: f-360 runs the Vite dev server every day.
+    # Fails on a high or critical advisory in any package, dev tools included: the Vite dev server runs every day in local development.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

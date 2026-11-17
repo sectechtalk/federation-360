@@ -105,9 +105,9 @@ test("the documented JSON Schema lists every field the builder writes", async ()
   }
 });
 
-test("the Download credentials file and Copy JSON buttons are never disabled", () => {
+test("the Download expiry report and Copy JSON buttons are never disabled", () => {
   const src = readFileSync("src/views/Inventory.tsx", "utf8");
-  for (const label of ["Download credentials file", "Copy JSON"]) {
+  for (const label of ["Download expiry report", "Copy JSON"]) {
     const line = src.split("\n").find((l) => l.includes(`>${label}</button>`))!;
     expect(line).toBeTruthy();
     expect(line).not.toMatch(/disabled=/);

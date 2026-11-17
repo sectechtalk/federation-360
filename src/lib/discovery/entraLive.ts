@@ -1,6 +1,6 @@
 /**
- * Sign in to Entra from the browser (f-360 only). The read-only Graph collection itself is
- * collectEntraExport from @sectechtalk/f360-collector, shared with c-360.
+ * Sign in to Entra from the browser (Federation 360 only). The read-only Graph collection itself is
+ * collectEntraExport from @sectechtalk/f360-collector, shared with certificates-360.
  *
  * OAuth 2.0 authorization code flow with PKCE, as a single-page app (no secret, no library):
  * the page redirects to Entra, Entra redirects back with ?code=..., and the page redeems the code
