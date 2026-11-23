@@ -3,6 +3,7 @@ import { useApp, ProtoChip, SequenceDiagram, Seg, Field, CodeBlock } from "../co
 import { FLOWS, GLOSSARY, METHOD } from "../data/learn";
 import { LIFECYCLES, SCENARIO, fillLab, type LifeStage } from "../data/lifecycle";
 import { PROTOCOLS } from "../lib/protocols";
+import { DEVICE_SSO_TITLE, DEVICE_SSO_INTRO, DEVICE_FLOWS, DEVICE_SSO_FACTS, DEVICE_SSO_CHECKS, DEVICE_SSO_PORTALS, DEVICE_SSO_SOURCES } from "../data/deviceSso";
 import { usePref } from "../lib/store";
 
 const GUID = /^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
@@ -81,6 +82,63 @@ function Lifecycle() {
   );
 }
 
+function DeviceSso() {
+  const [id, setId] = usePref("learn-device-sso", DEVICE_FLOWS[0].id);
+  const flow = DEVICE_FLOWS.find((f) => f.id === id) ?? DEVICE_FLOWS[0];
+  return (
+    <section className="panel stack" id="device-sso">
+      <h2>{DEVICE_SSO_TITLE}</h2>
+      <p style={{ maxWidth: "75ch" }}>{DEVICE_SSO_INTRO}</p>
+      <div className="callout small">
+        <strong>Read-only topic.</strong> Trying this needs Microsoft Intune and a Mac or an Entra joined Windows PC. The free lab tenant has neither, so there is no lab step here. Your SAML and OIDC apps need no changes for device SSO to work.
+      </div>
+      <div className="grid-3">
+        {DEVICE_SSO_FACTS.map((f) => (
+          <div key={f.title} className="panel stack">
+            <h3>{f.title}</h3>
+            <p className="small">{f.body}</p>
+          </div>
+        ))}
+      </div>
+      <div className="spread">
+        <h3>How it flows</h3>
+        <Seg label="Device flow" value={flow.id} onChange={setId} options={DEVICE_FLOWS.map((f) => ({ v: f.id, l: f.title }))} />
+      </div>
+      <p style={{ maxWidth: "75ch" }}>{flow.intro}</p>
+      <SequenceDiagram flow={flow} />
+      <div className="callout warn small">
+        <strong>Where it usually breaks:</strong>
+        <ul className="plain" style={{ marginTop: 4 }}>{flow.watch.map((w) => <li key={w}>{w}</li>)}</ul>
+      </div>
+      <h3>Check it on a device</h3>
+      <div className="grid-2">
+        {DEVICE_SSO_CHECKS.map((c) => (
+          <div key={c.title} className="panel stack">
+            <strong>{c.title}</strong>
+            <CodeBlock code={c.body} />
+            <div className="callout small"><strong>What success looks like:</strong> {c.success}</div>
+          </div>
+        ))}
+      </div>
+      <h3>Where to look in the portals</h3>
+      <ul className="plain stack small">
+        {DEVICE_SSO_PORTALS.map((p) => (
+          <li key={p.url} className="row">
+            <a className="btn sm" href={p.url} target="_blank" rel="noreferrer">Open {p.label} ↗</a>
+            <span>{p.what}</span>
+          </li>
+        ))}
+      </ul>
+      <details>
+        <summary><strong>Sources on Microsoft Learn</strong></summary>
+        <ul className="plain small" style={{ marginTop: 6 }}>
+          {DEVICE_SSO_SOURCES.map((s) => <li key={s.url}><a href={s.url} target="_blank" rel="noreferrer">{s.label}</a></li>)}
+        </ul>
+      </details>
+    </section>
+  );
+}
+
 export default function Learn() {
   const [flowId, setFlowId] = useState(FLOWS[0].id);
   const [q, setQ] = useState("");
@@ -124,6 +182,8 @@ export default function Learn() {
           <ul className="plain" style={{ marginTop: 4 }}>{flow.watch.map((w) => <li key={w}>{w}</li>)}</ul>
         </div>
       </section>
+
+      <DeviceSso />
 
       <section className="stack">
         <h2>A troubleshooting method that works every time</h2>

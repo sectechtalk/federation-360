@@ -17,7 +17,7 @@ const render = (el: JSX.Element, over?: Partial<AppCtx>) => renderToStaticMarkup
 
 describe("Getting started", () => {
   it("is the first rail section, above Manage, and the default page", () => {
-    expect(app).toMatch(/const groups = \["Getting started", "Manage", "Troubleshoot", "Learn"\]/);
+    expect(app).toMatch(/const groups = \["Getting started", "Manage", "Protect", "Troubleshoot", "Learn"\]/);
     expect(routeIds[0]).toBe("start");
     expect(app).toMatch(/const DEFAULT_ROUTE = "start";/);
     expect(app).toMatch(/\? h : DEFAULT_ROUTE;/);

@@ -3,6 +3,7 @@ import type { AppIntegration, Finding, ProtocolId, Severity, Tenant } from "../l
 import type { Store } from "../lib/store";
 import { protocolById } from "../lib/protocols";
 import type { Flow } from "../data/learn";
+import { ActionButton, copyNow } from "./busy";
 
 export interface AppCtx {
   store: Store | null;
@@ -12,7 +13,7 @@ export interface AppCtx {
   go: (route: string, params?: Record<string, string>) => void;
   params: Record<string, string>;
   toast: (msg: string) => void;
-  loadExamples: () => Promise<void>;
+  loadExamples: () => Promise<string | void>;
 }
 export const Ctx = createContext<AppCtx>(null as any);
 export const useApp = () => useContext(Ctx);
@@ -73,21 +74,13 @@ export function SummaryBar({ findings }: { findings: Finding[] }) {
   );
 }
 
-export function copyText(text: string, toast: (m: string) => void) {
-  navigator.clipboard?.writeText(text).then(
-    () => toast("Copied"),
-    () => toast("Copy isn't allowed here. Select the text and copy it manually."),
-  );
-}
-
 export function CodeBlock({ code, wrap }: { code: string; wrap?: boolean }) {
-  const { toast } = useApp();
   return (
     <div className="code-block">
       <pre className={`code${wrap ? " wrap" : ""}`}>{code}</pre>
-      <button className="btn sm copy" onClick={() => copyText(code, toast)}>
+      <ActionButton className="btn sm copy" busy="Copying…" report="toast" onClick={() => copyNow(code)}>
         Copy
-      </button>
+      </ActionButton>
     </div>
   );
 }

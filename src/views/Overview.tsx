@@ -1,11 +1,13 @@
 import { useApp, ProtoChip, Sev } from "../components/ui";
+import { ActionButton } from "../components/busy";
 import { appHealth, daysUntil, nextExpiry, worst } from "../lib/health";
+import { grantRows, grantSummary } from "../lib/grants";
 import { PROTOCOLS } from "../lib/protocols";
 import { usePref } from "../lib/store";
 import { ENV_LABEL, PLATFORM_LABEL, type Severity } from "../lib/types";
 
 export default function Overview() {
-  const { tenants, apps, go, loading, loadExamples } = useApp();
+  const { tenants, apps, go, loading, loadExamples, toast } = useApp();
   const scored = apps.map((a) => ({ app: a, findings: appHealth(a), sev: worst(appHealth(a)) }));
   const rank: Record<Severity, number> = { critical: 0, warn: 1, info: 2, ok: 3 };
   const attention = scored.filter((s) => s.sev === "critical" || s.sev === "warn").sort((x, y) => rank[x.sev] - rank[y.sev]);
@@ -32,6 +34,15 @@ export default function Overview() {
     today.push({ tone: "warn", text: `${soon.length} certificate${soon.length === 1 ? " or secret has" : "s or secrets have"} expired or will expire within 30 days. When one expires, sign-in to that app stops. Contact the app's owner and plan the renewal.`, btn: { label: "How to renew without an outage", run: () => go("learn") } });
   if (warned.length)
     today.push({ tone: "warn", text: `${warned.length} app${warned.length === 1 ? " has a warning" : "s have warnings"}: working today, but set up in a way that is risky or will break later. Fix these when nothing is on fire.` });
+  const grants = grantSummary(grantRows(apps));
+  if (grants.takeoverApps || grants.bulkApps || grants.shadowApps) {
+    const parts = [
+      grants.takeoverApps && `${grants.takeoverApps} could take over the tenant`,
+      grants.bulkApps && `${grants.bulkApps} read${grants.bulkApps === 1 ? "s" : ""} everyone's data with no user signed in`,
+      grants.shadowApps && `${grants.shadowApps} third-party app${grants.shadowApps === 1 ? " was" : "s were"} approved by users without IT`,
+    ].filter(Boolean);
+    today.push({ tone: grants.takeoverApps ? "crit" : "warn", text: `Risky app permissions: ${parts.join("; ")}. Review them and remove what isn't needed.`, btn: { label: "Open OAuth grants", run: () => go("grants") } });
+  }
   if (noOwner.length)
     today.push({ tone: "info", text: `${noOwner.length} app${noOwner.length === 1 ? " has" : "s have"} no owner recorded. Add one in Inventory so you know who on the app side to call when it breaks.`, btn: { label: "Open Inventory", run: () => go("inventory") } });
   if (anyExamples)
@@ -62,7 +73,7 @@ export default function Overview() {
           </p>
           <div className="row">
             <button className="btn primary" onClick={() => go("start")}>Open Getting started</button>
-            <button className="btn" onClick={() => setWelcomeHidden(true)}>Hide this</button>
+            <button className="btn" onClick={() => { setWelcomeHidden(true); toast("Welcome box hidden. Getting started is still in the left menu."); }}>Hide this</button>
           </div>
         </section>
       )}
@@ -77,7 +88,7 @@ export default function Overview() {
           <div className="row">
             <button className="btn primary" onClick={() => go("discover")}>Read my apps with Discover</button>
             <button className="btn" onClick={() => go("inventory", { add: "tenant" })}>Add a tenant by hand</button>
-            <button className="btn" onClick={loadExamples}>Load example data</button>
+            <ActionButton busy="Loading examples…" onClick={loadExamples}>Load example data</ActionButton>
           </div>
         </div>
       )}

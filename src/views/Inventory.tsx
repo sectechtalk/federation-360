@@ -1,5 +1,6 @@
 import { Fragment, useState } from "react";
-import { useApp, ProtoChip, Sev, Field, FindingList, copyText } from "../components/ui";
+import { useApp, ProtoChip, Sev, Field, FindingList } from "../components/ui";
+import { ActionButton, copyNow, downloadFile } from "../components/busy";
 import { appHealth, daysUntil, worst } from "../lib/health";
 import { PROTOCOLS } from "../lib/protocols";
 import {
@@ -26,13 +27,15 @@ function TenantEditor({ initial, onClose }: { initial: Tenant; onClose: () => vo
   const [confirmDel, setConfirmDel] = useState(false);
   const set = (k: keyof Tenant, v: string) => setT({ ...t, [k]: v });
   const save = async () => {
-    if (!t.name.trim()) return toast("Give the tenant a name");
-    await store?.put("tenants", { ...t, updatedAt: new Date().toISOString() });
+    if (!t.name.trim()) throw new Error("Give the tenant a name");
+    if (!store) throw new Error("Storage isn't connected yet. Wait a moment and try again.");
+    await store.put("tenants", { ...t, updatedAt: new Date().toISOString() });
     toast("Tenant saved");
     onClose();
   };
   const del = async () => {
-    await store?.remove("tenants", t.id);
+    if (!store) throw new Error("Storage isn't connected yet. Wait a moment and try again.");
+    await store.remove("tenants", t.id);
     toast("Tenant deleted");
     onClose();
   };
@@ -51,11 +54,11 @@ function TenantEditor({ initial, onClose }: { initial: Tenant; onClose: () => vo
         <Field id="t-notes" label="Notes" value={t.notes} onChange={(v) => set("notes", v)} multiline />
         <div className="spread">
           <div className="row">
-            <button className="btn primary" onClick={save}>Save tenant</button>
+            <ActionButton className="btn primary" busy="Saving…" onClick={save}>Save tenant</ActionButton>
             <button className="btn" onClick={onClose}>Cancel</button>
           </div>
           {initial.name && (confirmDel ? (
-            <div className="row"><span className="small">{used ? `${used} apps still point here.` : "Delete for good?"}</span><button className="btn danger" onClick={del}>Yes, delete</button><button className="btn" onClick={() => setConfirmDel(false)}>Keep</button></div>
+            <div className="row"><span className="small">{used ? `${used} apps still point here.` : "Delete for good?"}</span><ActionButton className="btn danger" busy="Deleting…" onClick={del}>Yes, delete</ActionButton><button className="btn" onClick={() => setConfirmDel(false)}>Keep</button></div>
           ) : <button className="btn danger" onClick={() => setConfirmDel(true)}>Delete</button>)}
         </div>
       </div>
@@ -141,13 +144,15 @@ function AppEditor({ initial, onClose }: { initial: AppIntegration; onClose: () 
   const sc = (k: keyof NonNullable<AppIntegration["scim"]>, v: string) => setA({ ...a, scim: { ...scim, [k]: v } });
   const isNew = !initial.name;
   const save = async () => {
-    if (!a.name.trim()) return toast("Give the integration a name");
-    await store?.put("apps", { ...a, updatedAt: new Date().toISOString() });
+    if (!a.name.trim()) throw new Error("Give the integration a name");
+    if (!store) throw new Error("Storage isn't connected yet. Wait a moment and try again.");
+    await store.put("apps", { ...a, updatedAt: new Date().toISOString() });
     toast("Integration saved");
     onClose();
   };
   const del = async () => {
-    await store?.remove("apps", a.id);
+    if (!store) throw new Error("Storage isn't connected yet. Wait a moment and try again.");
+    await store.remove("apps", a.id);
     toast("Integration deleted");
     onClose();
   };
@@ -251,11 +256,11 @@ function AppEditor({ initial, onClose }: { initial: AppIntegration; onClose: () 
 
         <div className="spread">
           <div className="row">
-            <button className="btn primary" onClick={save}>Save integration</button>
+            <ActionButton className="btn primary" busy="Saving…" onClick={save}>Save integration</ActionButton>
             <button className="btn" onClick={onClose}>Cancel</button>
           </div>
           {!isNew && (confirmDel ? (
-            <div className="row"><span className="small">Delete for good?</span><button className="btn danger" onClick={del}>Yes, delete</button><button className="btn" onClick={() => setConfirmDel(false)}>Keep</button></div>
+            <div className="row"><span className="small">Delete for good?</span><ActionButton className="btn danger" busy="Deleting…" onClick={del}>Yes, delete</ActionButton><button className="btn" onClick={() => setConfirmDel(false)}>Keep</button></div>
           ) : <button className="btn danger" onClick={() => setConfirmDel(true)}>Delete</button>)}
         </div>
       </div>
@@ -269,14 +274,17 @@ function ImportExport({ onClose }: { onClose: () => void }) {
   const [text, setText] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const doImport = async () => {
+    setErr(null);
     try {
       const d = JSON.parse(text);
       if (!Array.isArray(d.tenants) || !Array.isArray(d.apps)) throw new Error("Expected { tenants: [...], apps: [...] }.");
-      await Promise.all([...d.tenants.map((t: Tenant) => store?.put("tenants", t)), ...d.apps.map((a: AppIntegration) => store?.put("apps", a))]);
+      if (!store) throw new Error("storage isn't connected yet. Wait a moment and try again.");
+      await Promise.all([...d.tenants.map((t: Tenant) => store.put("tenants", t)), ...d.apps.map((a: AppIntegration) => store.put("apps", a))]);
       toast(`Imported ${d.tenants.length} tenants and ${d.apps.length} apps`);
       onClose();
     } catch (e: any) {
       setErr("Couldn't import: " + e.message);
+      throw new Error("Couldn't import. See the message above.");
     }
   };
   return (
@@ -284,16 +292,16 @@ function ImportExport({ onClose }: { onClose: () => void }) {
       <div className="drawer" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Import or export">
         <div className="spread"><h2>Back up or move your inventory</h2><button className="btn ghost" onClick={onClose}>Close</button></div>
         <p className="muted">Copy the JSON to save it in a file or a Git repository. Paste JSON below to import; items with the same ID are replaced.</p>
-        <div className="row"><button className="btn primary" onClick={() => copyText(json, toast)}>Copy inventory JSON</button><span className="small muted">{tenants.length} tenants, {apps.length} apps</span></div>
+        <div className="row"><ActionButton className="btn primary" busy="Copying…" onClick={() => copyNow(json)}>Copy inventory JSON</ActionButton><span className="small muted">{tenants.length} tenants, {apps.length} apps</span></div>
         <Field id="imp" label="Import JSON" value={text} onChange={(v) => { setText(v); setErr(null); }} multiline rows={10} error={err} placeholder='{"tenants": [...], "apps": [...]}' />
-        <div><button className="btn" onClick={doImport} disabled={!text.trim()}>Import</button></div>
+        <div><ActionButton busy="Importing…" onClick={doImport} disabled={!text.trim()}>Import</ActionButton></div>
       </div>
     </div>
   );
 }
 
 function CredentialsExport({ onClose }: { onClose: () => void }) {
-  const { tenants, apps, toast } = useApp();
+  const { tenants, apps } = useApp();
   // Remembered, so reopening the drawer (or reloading) doesn't silently drop the example apps and leave nothing to export.
   const [withExamples, setWithExamples] = usePref("credx-examples", false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -303,13 +311,9 @@ function CredentialsExport({ onClose }: { onClose: () => void }) {
   const json = JSON.stringify(doc, null, 2);
   const hasExamples = apps.some((a) => a.example);
   const download = () => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-    a.download = fileName;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    const msg = downloadFile(fileName, json, "application/json");
     setSaved(fileName);
-    toast(`Saved the expiry report (${doc.counts.total} credentials) to ${fileName}`);
+    return `${msg} ${doc.counts.total} credentials.`;
   };
   return (
     <div className="drawer-bg" onClick={onClose}>
@@ -325,8 +329,8 @@ function CredentialsExport({ onClose }: { onClose: () => void }) {
         )}
         <div className="row">
           {/* Never disabled: you can download again as often as you like, and an empty file is still a valid export. */}
-          <button className="btn primary" onClick={download}>Download expiry report</button>
-          <button className="btn" onClick={() => copyText(json, toast)}>Copy JSON</button>
+          <ActionButton className="btn primary" busy="Building report…" onClick={download}>Download expiry report</ActionButton>
+          <ActionButton busy="Copying…" onClick={() => copyNow(json)}>Copy JSON</ActionButton>
         </div>
         {saved && (
           <div className="callout" role="status">
@@ -363,9 +367,11 @@ export default function Inventory() {
   const tenantName = (id: string) => tenants.find((t) => t.id === id)?.name ?? "—";
   const examples = [...tenants.filter((t) => t.example), ...apps.filter((a) => a.example)];
   const clearExamples = async () => {
-    await Promise.all([...tenants.filter((t) => t.example).map((t) => store?.remove("tenants", t.id)), ...apps.filter((a) => a.example).map((a) => store?.remove("apps", a.id))]);
+    if (!store) throw new Error("Storage isn't connected yet. Wait a moment and try again.");
+    const n = examples.length;
+    await Promise.all([...tenants.filter((t) => t.example).map((t) => store.remove("tenants", t.id)), ...apps.filter((a) => a.example).map((a) => store.remove("apps", a.id))]);
     setConfirmClear(false);
-    toast("Example data removed");
+    toast(`Removed ${n} example items`);
   };
 
   return (
@@ -388,7 +394,7 @@ export default function Inventory() {
         <div className="callout spread">
           <span>{examples.length} fictional example items are loaded so you can explore. Remove them when you add your own.</span>
           {confirmClear ? (
-            <span className="row"><button className="btn sm danger" onClick={clearExamples}>Remove all examples</button><button className="btn sm" onClick={() => setConfirmClear(false)}>Keep</button></span>
+            <span className="row"><ActionButton className="btn sm danger" busy="Removing…" onClick={clearExamples}>Remove all examples</ActionButton><button className="btn sm" onClick={() => setConfirmClear(false)}>Keep</button></span>
           ) : <button className="btn sm" onClick={() => setConfirmClear(true)}>Remove examples</button>}
         </div>
       )}
@@ -398,7 +404,7 @@ export default function Inventory() {
         {loading ? <p className="muted">Loading…</p> : tenants.length === 0 ? (
           <div className="empty">
             <p>No tenants yet. A tenant is one identity provider instance: an Entra tenant, an AWS IAM Identity Center instance, an Okta org.</p>
-            <div className="row"><button className="btn primary" onClick={() => go("discover")}>Discover from your tenant</button><button className="btn" onClick={loadExamples}>Load example data</button></div>
+            <div className="row"><button className="btn primary" onClick={() => go("discover")}>Discover from your tenant</button><ActionButton busy="Loading examples…" onClick={loadExamples}>Load example data</ActionButton></div>
           </div>
         ) : (
           <div className="grid-3">

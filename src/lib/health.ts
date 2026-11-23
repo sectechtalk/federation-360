@@ -1,4 +1,5 @@
 import type { AppIntegration, Finding, Severity } from "./types";
+import { grantFindings } from "./grants";
 
 export const daysUntil = (iso: string, now = new Date()) =>
   iso ? Math.floor((new Date(iso + (iso.length === 10 ? "T00:00:00Z" : "")).getTime() - now.getTime()) / 86400000) : NaN;
@@ -75,6 +76,7 @@ export function appHealth(app: AppIntegration, now = new Date()): Finding[] {
         f.push({ severity: "info", title: `${c.kind === "secret" ? "Secret" : "Certificate"} “${c.name}” expired ${-left} days ago and is still attached`, detail: "Remove credentials you no longer use so nobody can mistake them for the live one." });
     }
   }
+  f.push(...grantFindings(app));
   if (!app.owner) f.push({ severity: "info", title: "No owner recorded", detail: "Every integration needs an accountable owner for access reviews and incidents." });
   return f;
 }

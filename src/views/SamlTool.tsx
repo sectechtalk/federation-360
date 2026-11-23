@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useApp, AppPicker, FindingList, SummaryBar, CodeBlock, Seg } from "../components/ui";
+import { ActionButton } from "../components/busy";
 import { checkSaml, decodeSamlInput, parseSaml, type ParsedSaml } from "../lib/saml";
 import { SAML_SAMPLES } from "../data/samples";
 import type { Finding } from "../lib/types";
@@ -94,7 +95,7 @@ export default function SamlTool() {
         <div className="spread">
           <span className="eyebrow">Try an example</span>
           <div className="row">
-            {SAML_SAMPLES.map((s) => <button key={s.id} className="btn sm" onClick={() => loadSample(s.id)}>{s.label}</button>)}
+            {SAML_SAMPLES.map((s) => <ActionButton key={s.id} className="btn sm" busy="Loading…" report="toast" onClick={async () => { await loadSample(s.id); return `Loaded example: ${s.label}`; }}>{s.label}</ActionButton>)}
           </div>
         </div>
         <label className="field" htmlFor="saml-in">

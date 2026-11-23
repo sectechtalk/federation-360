@@ -23,6 +23,10 @@ export interface SignInConfig {
 interface Pending extends SignInConfig {
   verifier: string;
   state: string;
+  /** Graph scopes asked for. Older pending entries don't have it (Discover's scopes). */
+  scopes?: string[];
+  /** The page that started the sign-in and gets the result. */
+  returnTo?: string;
 }
 
 /** Where this page would ask Entra to send the user back. */
@@ -54,17 +58,18 @@ async function challenge(verifier: string) {
   return b64url(new Uint8Array(d));
 }
 
-const scopeParam = () => [...GRAPH_SCOPES.map((s) => `https://graph.microsoft.com/${s}`), "openid", "profile"].join(" ");
+const scopeParam = (scopes: string[] = GRAPH_SCOPES) => [...scopes.map((s) => `https://graph.microsoft.com/${s}`), "openid", "profile"].join(" ");
 
-export async function startSignIn(cfg: SignInConfig) {
-  const p: Pending = { ...cfg, verifier: randomString(), state: randomString(16) };
+/** Discover's sign-in by default. Other pages pass the Graph scopes they need and their own route. */
+export async function startSignIn(cfg: SignInConfig, opts: { scopes?: string[]; returnTo?: string } = {}) {
+  const p: Pending = { ...cfg, verifier: randomString(), state: randomString(16), scopes: opts.scopes, returnTo: opts.returnTo };
   sessionStorage.setItem(PENDING_KEY, JSON.stringify(p));
   const q = new URLSearchParams({
     client_id: cfg.clientId,
     response_type: "code",
     redirect_uri: cfg.redirectUri,
     response_mode: "query",
-    scope: scopeParam(),
+    scope: scopeParam(p.scopes),
     state: p.state,
     code_challenge: await challenge(p.verifier),
     code_challenge_method: "S256",
@@ -93,11 +98,13 @@ export function consumeRedirect() {
   if (!pending || pending.state !== state) returned = { error: "The sign-in response didn't match a sign-in started from this page. Start again." };
   else if (q.get("error")) returned = { error: `${q.get("error")}: ${q.get("error_description") ?? ""}`, pending };
   else returned = { code: q.get("code")!, pending };
-  history.replaceState(null, "", location.pathname + "#discover");
+  history.replaceState(null, "", location.pathname + "#" + (pending?.returnTo ?? "discover"));
 }
 
-export const takeRedirectResult = () => {
+/** The sign-in result, once, for the page that started it (Discover when no page is named). */
+export const takeRedirectResult = (route = "discover") => {
   const r = returned;
+  if (r && (r.pending?.returnTo ?? "discover") !== route) return null;
   returned = null;
   return r;
 };
@@ -109,7 +116,7 @@ export async function redeemCode(code: string, p: Pending): Promise<string> {
     code,
     redirect_uri: p.redirectUri,
     code_verifier: p.verifier,
-    scope: scopeParam(),
+    scope: scopeParam(p.scopes),
   });
   const r = await fetch(`https://login.microsoftonline.com/${encodeURIComponent(p.tenantId)}/oauth2/v2.0/token`, {
     method: "POST",

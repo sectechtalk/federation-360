@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useApp, AppPicker, FindingList, SummaryBar, CodeBlock, Seg, Sev } from "../components/ui";
 import { checkJwt, CLAIM_HELP, decodeJwt, verifyJwt, type DecodedJwt, type VerifyResult } from "../lib/jwt";
 import { makeJwtSample } from "../data/samples";
+import { ActionButton } from "../components/busy";
 
 const TIME_CLAIMS = ["exp", "nbf", "iat", "auth_time"];
 
@@ -49,8 +50,15 @@ export default function JwtTool() {
   const parts = t?.raw.split(".") ?? [];
 
   const runVerify = async () => {
-    if (!t) return;
-    setVerify(await verifyJwt(t, keys.trim()));
+    if (!t) throw new Error("Paste a token first.");
+    const r = await verifyJwt(t, keys.trim());
+    setVerify(r);
+    if (!r.ok) throw new Error("Signature not verified. See the reason below.");
+    return "Signature verified";
+  };
+  const sample = (kind: "id" | "access" | "graph", label: string) => async () => {
+    await loadSample(kind);
+    return `Loaded: ${label}`;
   };
 
   return (
@@ -66,9 +74,9 @@ export default function JwtTool() {
         <div className="spread">
           <span className="eyebrow">Try an example</span>
           <div className="row">
-            <button className="btn sm" onClick={() => loadSample("id")}>Valid ID token</button>
-            <button className="btn sm" onClick={() => loadSample("access")}>Expired API token</button>
-            <button className="btn sm" onClick={() => loadSample("graph")}>Graph app-only token</button>
+            <ActionButton className="btn sm" busy="Signing sample…" report="toast" onClick={sample("id", "Valid ID token")}>Valid ID token</ActionButton>
+            <ActionButton className="btn sm" busy="Signing sample…" report="toast" onClick={sample("access", "Expired API token")}>Expired API token</ActionButton>
+            <ActionButton className="btn sm" busy="Signing sample…" report="toast" onClick={sample("graph", "Graph app-only token")}>Graph app-only token</ActionButton>
           </div>
         </div>
         <label className="field" htmlFor="jwt-in">
@@ -135,7 +143,7 @@ export default function JwtTool() {
                   : "Paste the JWKS from the issuer's jwks_uri (find it in the Metadata checker). For Entra: https://login.microsoftonline.com/{tenant}/discovery/v2.0/keys"}
               </p>
               <textarea aria-label="JWKS or secret" className="input" rows={6} value={keys} onChange={(e) => { setKeys(e.target.value); setVerify(null); }} placeholder='{"keys":[{"kty":"RSA","kid":"…","n":"…","e":"AQAB"}]}' spellCheck={false} />
-              <div className="row"><button className="btn primary" onClick={runVerify} disabled={!keys.trim()}>Verify</button></div>
+              <div className="row"><ActionButton className="btn primary" busy="Verifying…" onClick={runVerify} disabled={!keys.trim()}>Verify</ActionButton></div>
               {verify && <div className={`callout ${verify.ok ? "" : "warn"} small`}>{verify.message}</div>}
             </section>
           </div>

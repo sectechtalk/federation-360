@@ -1,0 +1,70 @@
+{
+  "manifest_version": 3,
+  "name": "Federation 360 Capture",
+  "version": "0.2.0",
+  "description": "Shows every SAML, OpenID Connect and OAuth sign-in in Federation 360's Flow tracer as it happens. Keeps only sign-in hops, in browser memory, and sends nothing anywhere else.",
+  "permissions": [
+    "webRequest",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Federation 360 Capture: open Flow tracer"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://sectechtalk.github.io/federation-360/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://login.microsoftonline.com/*",
+        "https://login.microsoft.com/*",
+        "https://login.windows.net/*",
+        "https://login.live.com/*",
+        "https://*.b2clogin.com/*",
+        "https://*.ciamlogin.com/*"
+      ],
+      "js": [
+        "idp-page.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "token-hook.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "relay.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "minimum_chrome_version": "116"
+}

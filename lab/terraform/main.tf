@@ -14,12 +14,15 @@ locals {
     "User.Read" = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
   }
 
-  # Read-only delegated Graph permissions for discovery.
+  # Read-only delegated Graph permissions for discovery, and for the MFA and SSO coverage page
+  # (sign-in method types per user, the authentication methods policy and security defaults).
   discovery_scopes = {
-    openid                 = "37f7f235-527c-4136-accd-4a02d197296e"
-    profile                = "14dad69e-099b-42c9-810b-d002981feec1"
-    "Application.Read.All" = "c79f8feb-a9db-4090-85f9-90d820caa0eb"
-    "Directory.Read.All"   = "06da0dbc-49e2-44d2-8312-53f166ab848a"
+    openid                              = "37f7f235-527c-4136-accd-4a02d197296e"
+    profile                             = "14dad69e-099b-42c9-810b-d002981feec1"
+    "Application.Read.All"              = "c79f8feb-a9db-4090-85f9-90d820caa0eb"
+    "Directory.Read.All"                = "06da0dbc-49e2-44d2-8312-53f166ab848a"
+    "UserAuthenticationMethod.Read.All" = "aec28ec7-4d02-4e8c-b864-50163aea77eb"
+    "Policy.Read.All"                   = "572fea84-0151-49b2-9301-11cb16974376"
   }
 
   issuer_v1 = "https://sts.windows.net/${var.tenant_id}/"

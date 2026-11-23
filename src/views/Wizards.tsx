@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useApp, ProtoChip, Field, CodeBlock } from "../components/ui";
+import { ActionButton } from "../components/busy";
 import { WIZARDS, type Wizard } from "../data/wizards";
 import { usePref } from "../lib/store";
 import { blankApp } from "./Inventory";
@@ -19,11 +20,13 @@ function Runner({ w, onExit }: { w: Wizard; onExit: () => void }) {
   const filled = (i: number) => (w.steps[i]?.fields ?? []).every((f) => !f.validate || !f.validate(values[f.key] ?? "", values));
 
   const save = async () => {
-    if (!store || !tenantId) return toast("Add a tenant in the inventory first");
+    if (!store || !tenantId) throw new Error("Add a tenant in the inventory first");
     const app = { ...blankApp(tenantId), ...w.toApp(values), environment: env as any, updatedAt: new Date().toISOString() };
     await store.put("apps", app);
-    toast(`Saved “${app.name}” to the inventory`);
+    const msg = `Saved “${app.name}” to the inventory`;
     go("inventory", { app: app.id });
+    toast(msg); // after the page change, so it isn't replaced by "Opened Inventory"
+    return msg;
   };
 
   return (
@@ -107,7 +110,7 @@ function Runner({ w, onExit }: { w: Wizard; onExit: () => void }) {
                   </div>
                 ) : <p className="muted">Add a tenant in the inventory first.</p>}
                 <div className="row">
-                  <button className="btn primary" onClick={save} disabled={!tenants.length}>Save as a new integration</button>
+                  <ActionButton className="btn primary" busy="Saving…" onClick={save} disabled={!tenants.length}>Save as a new integration</ActionButton>
                   <button className="btn" onClick={() => { setValues({}); setStep(0); toast("Wizard cleared"); }}>Start over</button>
                 </div>
               </div>

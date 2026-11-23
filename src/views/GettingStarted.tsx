@@ -3,7 +3,7 @@ import { usePref } from "../lib/store";
 import { ASK_YOUR_TEAM, BASICS, PHASES, SITUATIONS, START_STEPS } from "../data/gettingStarted";
 
 export default function GettingStarted() {
-  const { go } = useApp();
+  const { go, toast } = useApp();
   const [done, setDone] = usePref<string[]>("start-done", []);
   const toggle = (id: string) => setDone(done.includes(id) ? done.filter((d) => d !== id) : [...done, id]);
   const doneCount = START_STEPS.filter((s) => done.includes(s.id)).length;
@@ -84,7 +84,7 @@ export default function GettingStarted() {
             })}
           </div>
         ))}
-        {doneCount > 0 && <div><button className="btn sm" onClick={() => setDone([])}>Clear my ticks</button></div>}
+        {doneCount > 0 && <div><button className="btn sm" onClick={() => { setDone([]); toast("Ticks cleared"); }}>Clear my ticks</button></div>}
       </section>
 
       <section className="stack">

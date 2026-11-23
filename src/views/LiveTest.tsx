@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CodeBlock, useApp } from "../components/ui";
+import { ActionButton, BusyNote, LeaveLink, Spinner } from "../components/busy";
 import { FlowView } from "../components/FlowView";
 import { usePref } from "../lib/store";
 import { KIND_LABEL, type FlowCapture } from "../lib/flow";
@@ -32,16 +33,25 @@ export default function LiveTest() {
   const captures = captureStore(url, cfg?.stateless);
   const onAzure = cfg?.host === "azure" || !!cfg?.stateless;
 
-  const refresh = async () => {
+  /** Reads the test app's settings and runs. Returns the error text, or null when the test app answered. */
+  const refresh = async (): Promise<string | null> => {
     setReachErr(null);
     try {
       const c = await app.config();
       setCfg(c);
       setList(await captureStore(url, c.stateless).captures());
+      return null;
     } catch (e: any) {
+      const msg = e?.message ?? String(e);
       setCfg(null);
-      setReachErr(e?.message ?? String(e));
+      setReachErr(msg);
+      return msg;
     }
+  };
+  const checkNow = async () => {
+    const err = await refresh();
+    if (err) throw new Error(`The test app at ${url} didn't answer: ${err}`);
+    return `The test app at ${url} answered`;
   };
 
   useEffect(() => {
@@ -92,48 +102,42 @@ export default function LiveTest() {
     setError(null);
     setCapture(null);
     setUrl(v);
+    toast(`Switched to ${v}. Checking it now…`);
   };
 
   const open = async (id: string) => {
     setError(null);
-    try {
-      setCapture(await captures.capture(id));
-      window.scrollTo({ top: document.getElementById("live-result")?.offsetTop ?? 0, behavior: "smooth" });
-    } catch (e: any) {
-      setError(e?.message ?? String(e));
-    }
+    setCapture(await captures.capture(id));
+    window.scrollTo({ top: document.getElementById("live-result")?.offsetTop ?? 0, behavior: "smooth" });
+    return "Opened below";
   };
 
   const runCc = async () => {
-    setBusy("Asking Entra for an app-only token…");
     setError(null);
-    try {
-      const c = await app.runClientCredentials();
-      if (cfg?.stateless) await captures.save(c);
-      setCapture(c);
-      setList(await captures.captures());
-    } catch (e: any) {
-      setError(e?.message ?? String(e));
-    }
-    setBusy(null);
+    const c = await app.runClientCredentials();
+    if (cfg?.stateless) await captures.save(c);
+    setCapture(c);
+    setList(await captures.captures());
+    return "Token received and checked. The result is below.";
   };
 
   const runOidc = async () => {
-    if (!cfg?.oidc || !cfg.tenantId) return;
+    if (!cfg?.oidc || !cfg.tenantId) throw new Error("The test app has no OpenID Connect settings.");
     const blocked = browserSignInBlocker();
-    if (blocked) {
-      setError(blocked + " Open Federation 360 at http://localhost:5173/#livetest instead.");
-      return;
-    }
-    setBusy("Sending you to Microsoft to sign in…");
+    if (blocked) throw new Error(blocked + " Open Federation 360 at http://localhost:5173/#livetest instead.");
     await startOidcTest({ tenantId: cfg.tenantId, ...cfg.oidc, loginHint: cfg.labUsers?.[0] }, url, !!cfg.stateless);
+    // The browser normally leaves for Microsoft's sign-in page before this wait ends.
+    await new Promise((r) => setTimeout(r, 15000));
+    throw new Error("Microsoft's sign-in page didn't open. Select Run OIDC sign-in again.");
   };
 
   const clear = async () => {
     await captures.clear();
     setList([]);
     setCapture(null);
-    toast(cfg?.stateless ? "All captures deleted from this browser" : "All captures deleted from the test app");
+    const msg = cfg?.stateless ? "All captures deleted from this browser" : "All captures deleted from the test app";
+    toast(msg);
+    return msg;
   };
 
   return (
@@ -153,7 +157,7 @@ export default function LiveTest() {
 
       {!cfg && !mixed && (
         <section className="panel stack">
-          <div className="panel-head"><h2>Start the test app</h2><span className="sub">{reachErr ? "Not reachable" : "Checking…"}</span></div>
+          <div className="panel-head"><h2>Start the test app</h2><span className="sub">{reachErr ? "Not reachable" : <span className="row" role="status"><Spinner /> Checking…</span>}</span></div>
           <p className="small" style={{ margin: 0 }}>
             The test app runs in Docker next to Federation 360, at <span className="mono">{url}</span>. If it isn't running yet, run this in PowerShell 7. It signs you in to the lab tenant, finds the lab apps, creates a certificate for the client credentials test, and starts the container.
           </p>
@@ -166,7 +170,7 @@ export default function LiveTest() {
           </p>
           <CodeBlock code={DEPLOY_AZURE} />
           <div className="row">
-            <button className="btn primary" onClick={refresh}>Check again</button>
+            <ActionButton className="btn primary" busy="Checking…" onClick={checkNow}>Check again</ActionButton>
             <label className="field" style={{ minWidth: 260 }}>
               <span className="small muted">Test app address</span>
               <input className="input" value={draftUrl} onChange={(e) => setDraftUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && useAddress(draftUrl)} spellCheck={false} />
@@ -196,7 +200,7 @@ export default function LiveTest() {
               {onAzure ? (
                 <button className="btn sm" onClick={() => useAddress(DEFAULT_TESTAPP_URL)}>Use the one on this PC</button>
               ) : null}
-              <button className="btn sm" onClick={refresh}>Refresh</button>
+              <ActionButton className="btn sm" busy="Checking…" onClick={checkNow}>Refresh</ActionButton>
             </div>
           </div>
           {onAzure && <p className="small muted" style={{ margin: 0 }}>The Azure test app keeps nothing. Each run comes back to this page and is kept in this browser only (the last 30).</p>}
@@ -213,10 +217,10 @@ export default function LiveTest() {
               <p className="small" style={{ margin: 0 }}>The test app sends a SAML request to Entra, you sign in as a lab user, and Entra posts a signed SAML response back to the test app.</p>
               {cfg.saml ? (
                 <div className="stack">
-                  <a className="btn primary" href={cfg.saml.loginUrl}>Run SAML sign-in</a>
+                  <LeaveLink className="btn primary" href={cfg.saml.loginUrl}>Run SAML sign-in</LeaveLink>
                   <div className="row">
-                    <a className="btn sm" href={`${cfg.saml.loginUrl}?fault=issuer`} title="Expect AADSTS700016">Break it: wrong Issuer</a>
-                    <a className="btn sm" href={`${cfg.saml.loginUrl}?fault=acs`} title="Expect AADSTS50011">Break it: wrong reply URL</a>
+                    <LeaveLink className="btn sm" href={`${cfg.saml.loginUrl}?fault=issuer`} title="Expect AADSTS700016">Break it: wrong Issuer</LeaveLink>
+                    <LeaveLink className="btn sm" href={`${cfg.saml.loginUrl}?fault=acs`} title="Expect AADSTS50011">Break it: wrong reply URL</LeaveLink>
                   </div>
                   <span className="small muted">The broken runs end on a Microsoft error page. Note the AADSTS code, come back here and open the capture to compare.</span>
                 </div>
@@ -226,16 +230,16 @@ export default function LiveTest() {
             <div className="panel stack">
               <div className="panel-head"><h2>OpenID Connect</h2><span className="sub">Federation 360 as the client</span></div>
               <p className="small" style={{ margin: 0 }}>Federation 360 signs you in with authorization code and PKCE, gets an ID token and an access token for LAB-API, and hands the access token to the test API to check.</p>
-              {cfg.oidc ? <button className="btn primary" onClick={runOidc} disabled={!!busy}>Run OIDC sign-in</button> : <span className="small muted">Not set up: F360-LiveTest or LAB-API wasn't found.</span>}
+              {cfg.oidc ? <ActionButton className="btn primary" busy="Opening Microsoft sign-in…" onClick={runOidc} disabled={!!busy}>Run OIDC sign-in</ActionButton> : <span className="small muted">Not set up: F360-LiveTest or LAB-API wasn't found.</span>}
             </div>
 
             <div className="panel stack">
               <div className="panel-head"><h2>Client credentials</h2><span className="sub">Test app as a daemon</span></div>
               <p className="small" style={{ margin: 0 }}>The test app signs in as LAB-Daemon with a certificate (no secret), gets an app-only token for LAB-API, and checks it like an API would.</p>
-              {cfg.clientCredentials ? <button className="btn primary" onClick={runCc} disabled={!!busy}>Run client credentials</button> : <span className="small muted">{onAzure ? "Not set up: run the Azure deploy script again; it copies the certificate from your PC." : "Not set up: the start script creates the certificate."}</span>}
+              {cfg.clientCredentials ? <ActionButton className="btn primary" busy="Asking Entra for a token…" onClick={runCc} disabled={!!busy}>Run client credentials</ActionButton> : <span className="small muted">{onAzure ? "Not set up: run the Azure deploy script again; it copies the certificate from your PC." : "Not set up: the start script creates the certificate."}</span>}
             </div>
           </div>
-          {busy && <p className="small muted" style={{ margin: 0 }}>{busy}</p>}
+          {busy && <BusyNote className="small muted">{busy}</BusyNote>}
         </section>
       )}
 
@@ -245,7 +249,7 @@ export default function LiveTest() {
         <section className="stack">
           <div className="spread">
             <h2>Recent runs</h2>
-            <button className="btn sm danger" onClick={clear}>Delete all</button>
+            <ActionButton className="btn sm danger" busy="Deleting…" onClick={clear}>Delete all</ActionButton>
           </div>
           <div className="table-wrap">
             <table>
@@ -256,7 +260,7 @@ export default function LiveTest() {
                     <td className="small">{new Date(c.startedAt).toLocaleString()}</td>
                     <td><div>{c.title}</div><div className="small muted">{KIND_LABEL[c.kind]}</div></td>
                     <td className="small">{c.steps}</td>
-                    <td><button className="btn sm" onClick={() => open(c.id)}>Open</button></td>
+                    <td><ActionButton className="btn sm" busy="Opening…" report="toast" quietOk onClick={() => open(c.id)}>Open</ActionButton></td>
                   </tr>
                 ))}
               </tbody>

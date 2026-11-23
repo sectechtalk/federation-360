@@ -1,15 +1,26 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../components/ui";
+import { ActionButton } from "../components/busy";
 import { FlowView } from "../components/FlowView";
+import { EntraVerdict } from "../components/EntraVerdict";
 import { parseHar } from "../lib/har";
-import { CAPTURE_FORMAT, type FlowCapture } from "../lib/flow";
+import { CAPTURE_FORMAT, KIND_LABEL, type FlowCapture } from "../lib/flow";
+import { flowToCapture, useBrowserCaptures } from "../lib/browserCapture";
 import { HAR_SAMPLES } from "../data/harSamples";
+
+const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 export default function FlowTracer() {
   const { toast } = useApp();
+  const live = useBrowserCaptures();
   const [capture, setCapture] = useState<FlowCapture | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [over, setOver] = useState(false);
+  /** Which recorded sign-in is open. "latest" follows each new sign-in as it happens. */
+  const [pick, setPick] = useState<string | "latest">("latest");
+
+  const liveCaptures = useMemo(() => live.flows.map(flowToCapture), [live.flows]);
+  const shown: FlowCapture | null = capture ?? (pick === "latest" ? liveCaptures[0] : liveCaptures.find((c) => c.id === pick)) ?? null;
 
   const load = (text: string, name: string) => {
     setError(null);
@@ -26,12 +37,26 @@ export default function FlowTracer() {
     try {
       const c = parseHar(text, name);
       setCapture(c);
-      if (!c.steps.length) toast("No sign-in traffic found in this file");
+      if (!c.steps.length) toast("No sign-in traffic found in this recording");
     } catch (e: any) {
       setCapture(null);
       setError(e.message);
     }
   };
+
+  // Ctrl+V anywhere on the page: DevTools > Network > right-click > Copy > Copy all as HAR, then paste here.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      const text = e.clipboardData?.getData("text") ?? "";
+      if (!/^\s*\{/.test(text)) return;
+      e.preventDefault();
+      load(text, "Pasted from DevTools");
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  });
 
   const openFile = async (f: File | undefined) => {
     if (!f) return;
@@ -47,21 +72,81 @@ export default function FlowTracer() {
     load(JSON.stringify(await s.build()), `Example: ${s.label}`);
   };
 
+  const openLive = (id: string | "latest") => {
+    setCapture(null);
+    setError(null);
+    setPick(id);
+  };
+
   return (
     <div className="page">
       <div className="page-head">
         <div>
           <h1>Flow tracer</h1>
-          <p>Record a sign-in in your browser and drop the recording here. Federation 360 lays out every hop between the app, your browser and the identity provider, decodes each SAML message and token, and flags what's wrong.</p>
+          <p>Every hop between the app, your browser and the identity provider, with each SAML message and token decoded and anything wrong flagged. With the Federation 360 Capture extension, sign-ins appear here by themselves as they happen.</p>
         </div>
       </div>
 
+      {live.connected ? (
+        <section className="panel stack" aria-label="Sign-ins in this browser">
+          <div className="spread">
+            <div className="row">
+              <span className="chip" style={{ color: "var(--ok)" }}>● Capturing</span>
+              <span className="small muted">Federation 360 Capture {live.version} is recording sign-ins in this browser, including the tokens apps fetch in the background. Sign in to any app in another tab or window and it appears here.</span>
+            </div>
+            <div className="row">
+              <button className="btn sm" onClick={() => openLive("latest")} disabled={pick === "latest" && !capture}>Follow new sign-ins</button>
+              <button className="btn sm danger" onClick={() => { const n = live.flows.length; live.clear(); toast(`Cleared ${n} sign-in${n === 1 ? "" : "s"} from the list`); }} disabled={!live.flows.length}>Clear list</button>
+            </div>
+          </div>
+          {live.version && live.version < "0.2.0" && (
+            <div className="callout warn">This extension is version {live.version}. To also capture tokens apps fetch in the background, open <span className="mono">edge://extensions</span> or <span className="mono">chrome://extensions</span> and click the reload arrow on Federation 360 Capture.</div>
+          )}
+          {liveCaptures.length ? (
+            <div className="row" role="list">
+              {liveCaptures.map((c, i) => {
+                const on = !capture && (pick === c.id || (pick === "latest" && i === 0));
+                return (
+                  <button key={c.id} role="listitem" className={`btn sm${on ? " on" : ""}`} onClick={() => openLive(c.id)} title={`${c.steps.length} hops`}>
+                    {time(c.startedAt)} · {KIND_LABEL[c.kind]} · {c.title.replace(/^Sign-in on /, "")}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="small muted" style={{ margin: 0 }}>No sign-ins yet. Open an app in another tab and sign in; the flow shows up here within a second.</p>
+          )}
+          <p className="small muted" style={{ margin: 0 }}>
+            Tokens an app's own server asks for (a web app with a client secret or certificate) never pass through this browser, so no browser tool can show them. Entra's verdict, under each sign-in, still covers those.
+          </p>
+        </section>
+      ) : (
+        <section className="panel stack" aria-label="Automatic capture">
+          <div className="callout">
+            <strong>Turn on automatic capture (one time).</strong> Load the Federation 360 Capture extension in Edge or Chrome and every sign-in appears on this page as it happens, decoded, with nothing to save or upload.
+          </div>
+          <details>
+            <summary>How to load the extension</summary>
+            <ol className="small" style={{ margin: "8px 0 0", paddingLeft: 20, display: "grid", gap: 4 }}>
+              <li>Open <span className="mono">edge://extensions</span> in Edge or <span className="mono">chrome://extensions</span> in Chrome.</li>
+              <li>Turn on <strong>Developer mode</strong>.</li>
+              <li>Click <strong>Load unpacked</strong> and choose the <span className="mono">extension</span> folder inside your Federation 360 folder.</li>
+              <li>Edge only, for InPrivate windows: click <strong>Details</strong> under Federation 360 Capture and turn on <strong>Allow in InPrivate</strong>. In Chrome the setting is <strong>Allow in Incognito</strong>.</li>
+              <li>Reload this page. A green <strong>Capturing</strong> label replaces this box.</li>
+            </ol>
+            <p className="small muted" style={{ margin: "8px 0 0" }}>
+              The extension keeps only sign-in hops (SAML messages, authorize and token calls, redirects that carry a code or token, AADSTS error pages), holds them in browser memory until the browser closes, and passes them only to this page. It sends nothing anywhere else.
+            </p>
+          </details>
+        </section>
+      )}
+
       <section className="panel stack">
         <div className="spread">
-          <span className="eyebrow">Try an example</span>
+          <span className="eyebrow">Or load a recording</span>
           <div className="row">
             {HAR_SAMPLES.map((s) => (
-              <button key={s.id} className="btn sm" onClick={() => sample(s.id)}>{s.label}</button>
+              <ActionButton key={s.id} className="btn sm" busy="Building example…" report="toast" onClick={async () => { await sample(s.id); return `Loaded example: ${s.label}`; }}>{s.label}</ActionButton>
             ))}
           </div>
         </div>
@@ -71,28 +156,28 @@ export default function FlowTracer() {
           onDragLeave={() => setOver(false)}
           onDrop={(e) => { e.preventDefault(); setOver(false); openFile(e.dataTransfer.files[0]); }}
         >
-          <strong>Drop a .har file here, or click to choose one</strong>
-          <span className="small muted">The file is read in this tab only. Nothing is uploaded or saved.</span>
+          <strong>Press Ctrl+V to paste a recording, drop a .har recording file (HTTP Archive) here, or click to choose one</strong>
+          <span className="small muted">Read in this tab only. Nothing is uploaded or saved.</span>
           <input type="file" accept=".har,.json,application/json" style={{ display: "none" }} onChange={(e) => openFile(e.target.files?.[0])} />
         </label>
         <details>
-          <summary>How to record a sign-in (Edge or Chrome)</summary>
+          <summary>Without the extension: copy a sign-in from the browser's developer tools</summary>
           <ol className="small" style={{ margin: "8px 0 0", paddingLeft: 20, display: "grid", gap: 4 }}>
-            <li>Open a new InPrivate (Edge) or Incognito (Chrome) window, so an existing session doesn't skip the sign-in.</li>
             <li>Go to the app's address, press F12 and open the <strong>Network</strong> tab.</li>
             <li>Tick <strong>Preserve log</strong>. Without it the list clears at every redirect and the SAML post is lost.</li>
             <li>Sign in to the app as you normally would, until you see the app or the error.</li>
-            <li>Right-click anywhere in the request list and choose <strong>Save all as HAR with content</strong>.</li>
-            <li>Drop the saved file above.</li>
+            <li>Right-click anywhere in the request list and choose <strong>Copy</strong> &gt; <strong>Copy all as HAR (sanitized)</strong>. HAR stands for HTTP Archive, the browser's standard recording of network traffic. Older versions call it <strong>Copy all as HAR</strong>. Sanitized leaves out cookies and the API call tokens, and keeps every SAML message and sign-in step.</li>
+            <li>Come back to this page and press <strong>Ctrl+V</strong>.</li>
           </ol>
           <p className="small muted" style={{ margin: "8px 0 0" }}>
-            A HAR file holds live session cookies and tokens. Treat it like a password: don't email it or attach it to tickets. To share what you found, use <strong>Download redacted copy</strong> below; it keeps only the sign-in hops and removes codes, token signatures and SAML signature values.
+            A recording holds live session cookies and tokens. Treat it like a password: don't email it or attach it to tickets. To share what you found, use <strong>Download redacted copy</strong> below; it keeps only the sign-in hops and removes codes, token signatures and SAML signature values.
           </p>
         </details>
       </section>
 
       {error && <div className="callout warn">{error}</div>}
-      {capture && <FlowView capture={capture} />}
+      {shown && <EntraVerdict key={shown.id} capture={shown} />}
+      {shown && <FlowView capture={shown} />}
     </div>
   );
 }

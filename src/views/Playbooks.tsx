@@ -3,7 +3,7 @@ import { useApp, ProtoChip } from "../components/ui";
 import { PLAYBOOKS, playbookById, type Playbook } from "../data/playbooks";
 import type { ProtocolId } from "../lib/types";
 
-const TOOL_LABEL: Record<string, string> = { saml: "SAML decoder", jwt: "JWT decoder", metadata: "Metadata checker", scim: "SCIM checker", inventory: "Inventory", wizards: "Setup wizards" };
+const TOOL_LABEL: Record<string, string> = { saml: "SAML decoder", jwt: "JWT decoder", metadata: "Metadata checker", scim: "SCIM checker", inventory: "Inventory", wizards: "Setup wizards", discover: "Discover", grants: "OAuth grants", posture: "MFA and SSO coverage", detections: "Detections", flowtracer: "Flow tracer" };
 
 function Detail({ p, onBack }: { p: Playbook; onBack: () => void }) {
   const { go } = useApp();

@@ -1,7 +1,26 @@
-import { emptyOidc, emptySaml, type AppIntegration, type Tenant } from "../lib/types";
+import { emptyOidc, emptySaml, type AppIntegration, type DiscoveryInfo, type Tenant } from "../lib/types";
 
 const day = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 const now = () => new Date().toISOString();
+
+/** A made-up tenant scan result for an example app. */
+function exampleDiscovery(appId: string, p: Partial<DiscoveryInfo>): DiscoveryInfo {
+  return {
+    provider: "entra",
+    externalId: `entra:${appId}`,
+    appId,
+    servicePrincipalId: "e1a2b3c4-0000-4000-8000-" + appId.slice(-12),
+    lastSeen: now(),
+    enabled: true,
+    owners: [],
+    identifierUris: [],
+    redirectUris: [],
+    implicit: { idToken: false, accessToken: false },
+    credentials: [],
+    permissions: [],
+    ...p,
+  };
+}
 
 export const EXAMPLE_TENANT_ID = "8f2b6c1e-0d4a-4a7e-9a51-3c0d2e7b9f10";
 
@@ -79,6 +98,43 @@ export function exampleData(): { tenants: Tenant[]; apps: AppIntegration[] } {
       owner: "Operations IT",
       oidc: { ...emptyOidc(), clientId: "c3d4e5f6-0718-4293-a4b5-c6d7e8f90a1b", redirectUris: "https://field.contoso.example/auth/callback\nhttp://localhost:3000/auth/callback", clientType: "public", grantType: "authorization_code", scopes: "openid profile api://field-api/Jobs.Read", audience: "c3d4e5f6-0718-4293-a4b5-c6d7e8f90a1b", issuer: `https://login.microsoftonline.com/${EXAMPLE_TENANT_ID}/v2.0` },
       notes: "Single-page app using auth code + PKCE.",
+    }),
+    // Two apps with permissions, so the OAuth grants page has something to show before a real scan.
+    base({
+      id: "ex-notes",
+      name: "Northwind Meeting Notes",
+      protocol: "oidc",
+      owner: "",
+      status: "live",
+      oidc: { ...emptyOidc(), clientId: "0b7e6c51-9a3d-4f2e-8c1b-5d4a3e2f1a09", redirectUris: "https://app.northwind-notes.example/auth/callback", clientType: "confidential", grantType: "authorization_code", scopes: "openid profile offline_access Mail.Read Files.Read.All Calendars.Read", audience: "https://graph.microsoft.com" },
+      discovery: exampleDiscovery("0b7e6c51-9a3d-4f2e-8c1b-5d4a3e2f1a09", {
+        thirdParty: true,
+        publisher: "Northwind Notes Ltd (unverified)",
+        redirectUris: [{ uri: "https://app.northwind-notes.example/auth/callback", type: "web" }],
+        permissions: ["ex-user-1", "ex-user-2", "ex-user-3"].flatMap(() =>
+          ["openid", "profile", "offline_access", "Mail.Read", "Files.Read.All", "Calendars.Read"].map((value) => ({ resource: "Microsoft Graph", value, type: "delegated" as const, status: "granted" as const, consent: "Principal" })),
+        ),
+      }),
+      notes: "AI meeting-notes app three users signed up for on their own. Example data.",
+    }),
+    base({
+      id: "ex-helpdesk",
+      name: "Helpdesk automation",
+      protocol: "oauth",
+      owner: "",
+      oidc: { ...emptyOidc(), clientId: "6f1d2c3b-4a59-4e8d-9c7b-2a1f0e9d8c7b", redirectUris: "", clientType: "confidential", grantType: "client_credentials", scopes: "https://graph.microsoft.com/.default", audience: "https://graph.microsoft.com", issuer: `https://sts.windows.net/${EXAMPLE_TENANT_ID}/`, secretExpires: day(140) },
+      discovery: exampleDiscovery("6f1d2c3b-4a59-4e8d-9c7b-2a1f0e9d8c7b", {
+        objectId: "e1a2b3c4-0000-4000-8000-00000000a001",
+        credentials: [{ kind: "secret", on: "application", name: "helpdesk-runner", keyId: "ex-key-1", start: day(-225) + "T00:00:00Z", end: day(140) + "T00:00:00Z" }],
+        permissions: [
+          { resource: "Microsoft Graph", value: "User.Read.All", type: "application", status: "requested" },
+          { resource: "Microsoft Graph", value: "Mail.Send", type: "application", status: "requested" },
+          { resource: "Microsoft Graph", value: "User.Read.All", type: "application", status: "granted" },
+          { resource: "Microsoft Graph", value: "Mail.Send", type: "application", status: "granted" },
+          { resource: "Microsoft Graph", value: "Application.ReadWrite.All", type: "application", status: "granted" },
+        ],
+      }),
+      notes: "Script that creates tickets. Someone granted Application.ReadWrite.All while testing and never removed it. Example data.",
     }),
   ];
   return { tenants, apps };

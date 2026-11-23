@@ -13,7 +13,7 @@ export interface LabStep {
 
 export const LAB_BUILDS = [
   { name: "F360-LiveTest", protocol: "oidc", what: "Single-page app for auth code + PKCE sign-ins from Federation 360." },
-  { name: "F360-Discovery", protocol: "oidc", what: "Single-page app for the Discover page's “Sign in and scan”. Read-only delegated Graph permissions (Application.Read.All, Directory.Read.All); you consent on first sign-in." },
+  { name: "F360-Discovery", protocol: "oidc", what: "Single-page app for “Sign in and scan” on Discover and “Sign in and read” on MFA and SSO coverage. Read-only delegated Graph permissions (Application.Read.All, Directory.Read.All, UserAuthenticationMethod.Read.All, Policy.Read.All); you consent on first sign-in." },
   { name: "LAB-OIDC-Playground", protocol: "oidc", what: "Sends a real ID token to jwt.ms so you can read it. Uses implicit flow on purpose, so the inventory flags it." },
   { name: "LAB-SAML-App", protocol: "saml", what: "Enterprise app with a signing certificate. Its SAML response is posted to jwt.ms. Assignment is required, so you can trigger AADSTS50105." },
   { name: "LAB-API", protocol: "oauth", what: "A protected API with a delegated scope (Jobs.Read) and an application role (Jobs.Read.All)." },

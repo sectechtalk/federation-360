@@ -78,6 +78,23 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn.sm.ghost { padding: 2px 8px; }
 .btn.on, .btn[aria-pressed="true"]:not(#theme-toggle) { background: var(--accent-strong); color: var(--accent-ink); border-color: var(--accent-strong); }
 .btn:disabled, .btn:disabled:hover, .btn.primary:disabled, .btn.danger:disabled { background: var(--btn-off-bg); color: var(--btn-off-fg); border: 1px dashed var(--btn-off-border); cursor: not-allowed; filter: none; }
+/* Busy (2026-11-21 house rule): a working button keeps its solid edge and colour, gains a moving stripe, a spinner and
+   a progress cursor. It never looks like a disabled button (grey, dashed). */
+.act { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: 100%; }
+.btn.is-busy, .btn.is-busy:hover { cursor: progress; border-style: solid; filter: none; background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, .22) 0 8px, transparent 8px 16px); background-size: 200% 100%; animation: busy-stripe 1.2s linear infinite; }
+.btn.is-busy:not(.primary):not(.danger) { border-color: var(--accent-strong); }
+.spin { width: 12px; height: 12px; flex: none; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; }
+.secs { font-variant-numeric: tabular-nums; opacity: .85; }
+.act-msg { font-size: var(--text-sm); font-weight: 500; overflow-wrap: anywhere; }
+.act-msg.ok { color: var(--ok); }
+.act-msg.err { color: var(--crit); }
+.busy-note { display: flex; align-items: center; gap: 8px; }
+.code-block .act-msg { display: none; }
+.acked { animation: ack .6s ease-out; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes busy-stripe { to { background-position: -45px 0; } }
+@keyframes ack { 0% { box-shadow: 0 0 0 0 var(--accent-strong); } 100% { box-shadow: 0 0 0 7px transparent; } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: spin 1.6s linear infinite !important; } .btn.is-busy { animation: none !important; } }
 input[type="file"]::file-selector-button { border: 1px solid var(--btn-border); background: var(--btn-bg); color: var(--btn-fg); padding: 5px 10px; border-radius: 6px; cursor: pointer; font: inherit; font-weight: 500; margin-right: 10px; }
 input[type="file"]::file-selector-button:hover { background: var(--btn-hover-bg); }
 input[type="file"]:disabled::file-selector-button { background: var(--btn-off-bg); color: var(--btn-off-fg); border: 1px dashed var(--btn-off-border); cursor: not-allowed; }
@@ -137,7 +154,7 @@ td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .code { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px; padding: 12px; overflow-x: auto; font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.55; white-space: pre; margin: 0; max-height: 460px; }
 .code.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
 .code-block { position: relative; }
-.code-block .copy { position: absolute; top: 6px; right: 6px; }
+.code-block > .act { position: absolute; top: 6px; right: 6px; }
 .jwt-raw { font-family: var(--font-mono); font-size: var(--text-sm); overflow-wrap: anywhere; line-height: 1.6; }
 .jwt-h { color: var(--crit); } .jwt-p { color: var(--saml); } .jwt-s { color: var(--oidc); }
 .claim-key { font-family: var(--font-mono); font-weight: 500; }
@@ -164,6 +181,11 @@ td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .where { font-size: var(--text-sm); background: var(--surface-2); border-radius: 6px; padding: 8px 10px; font-family: var(--font-mono); overflow-wrap: anywhere; }
 .callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 9px 12px; border-radius: 0 6px 6px 0; font-size: var(--text-base); }
 .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+.callout.crit { border-color: var(--crit); background: var(--crit-soft); }
+.meter { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--line); }
+.meter-ok { background: var(--ok); }
+.meter-warn { background: var(--warn); }
+.meter-crit { background: var(--crit); }
 ol.actions, ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
 .card-btn { text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s; color: inherit; border: 1px solid var(--btn-border); border-left-width: 4px; }
 .card-btn:hover { background: var(--btn-bg); }

@@ -941,6 +941,162 @@ export const PLAYBOOKS: Playbook[] = [
     fixes: ["Use SameSite=None; Secure for those cookies, serve everything on one https host, share data protection keys across instances."],
     tags: ["cookie", "samesite", "state"],
   },
+  {
+    id: "mfa-phishing-resistant-rollout",
+    title: "Roll out phishing-resistant MFA (passkeys) in stages",
+    protocols: ["saml", "oidc", "oauth"],
+    platforms: ["Microsoft Entra ID"],
+    symptom: "MFA and SSO coverage shows admins or users with no MFA, or with only phishable MFA (Authenticator push, codes, SMS), or passkeys switched off.",
+    meaning:
+      "Push approvals, one-time codes and SMS can be relayed in real time by a fake sign-in page (adversary-in-the-middle kits steal the session cookie), and push can be approved by a tired user (MFA fatigue). Passkeys, Windows Hello for Business and macOS Platform SSO are bound to the real Microsoft sign-in address and to the device, so a fake page gets nothing it can replay.",
+    causes: [
+      "The tenant started with Authenticator push or SMS and never moved on.",
+      "Passkeys (FIDO2) are off in the authentication methods policy, so nobody can register one.",
+      "Admins were set up before MFA was required and never registered anything stronger.",
+    ],
+    checks: [
+      "MFA and SSO coverage: percentage with a phishing-resistant method, and the admins list.",
+      "Entra > Protection > Authentication methods > Policies: is Passkey (FIDO2) enabled, and for which group?",
+      "With P1: Authentication methods > Activity shows registration and usage over time.",
+    ],
+    fixes: [
+      "Wave 1, admins: enable Passkey (FIDO2) for an admins group, issue a Temporary Access Pass to anyone with nothing usable, and have each admin register at https://mysignins.microsoft.com/security-info. With P1, require the Phishing-resistant MFA authentication strength for directory roles in Conditional Access (report-only first).",
+      "Wave 2, pilot: add a pilot group (about 10%, start with people already on Authenticator) to the passkey policy. Collect problems for a week: older phones, shared devices, people without a phone.",
+      "Wave 3, everyone: target All users, run a registration campaign, and with P1 widen the Conditional Access policy. Then switch off SMS and voice once nobody depends on them.",
+      "Rollback at any wave: set the Conditional Access policy back to report-only or remove the group from the passkey policy. Other methods stay registered, so sign-in keeps working.",
+      "Entra ID Free: registration and passkey sign-in are free, and security defaults keep requiring MFA. Enforcing the passkey specifically needs Conditional Access (P1).",
+    ],
+    tools: ["posture"],
+    tags: ["mfa", "passkey", "fido2", "phishing-resistant", "rollout"],
+  },
+  // ---------- Identity incidents (Detections page) ----------
+  {
+    id: "incident-mfa-fatigue",
+    title: "Incident: MFA fatigue (push bombing)",
+    protocols: ["saml", "oidc", "oauth"],
+    platforms: ["Microsoft Entra ID"],
+    symptom: "Detections shows several MFA prompts a user didn't complete in a few minutes, maybe followed by a successful sign-in, or the user says they keep getting Approve requests they didn't start.",
+    meaning:
+      "Each prompt means someone typed the user's correct password. The attacker keeps triggering prompts hoping the user approves one to make them stop. If a sign-in succeeded afterwards, assume the account is taken over.",
+    causes: ["The password was phished, reused from another breach, or sprayed.", "The user's MFA method is push approval, which can be approved without reading it."],
+    checks: [
+      "Sign-in logs > the user > filter Status = Failure: error 500121 rows, their IP addresses and locations.",
+      "Did a success follow from the same address? Open it and read Authentication Details (which method satisfied MFA).",
+      "Ask the user, on a channel the attacker can't see (phone, Teams from another account), whether they approved anything.",
+    ],
+    fixes: [
+      "Approved or unsure: Revoke-MgUserSignInSession -UserId <upn> (ends every session and refresh token), reset the password, and check Security info for a method the user doesn't recognise.",
+      "Not approved: reset the password anyway (the attacker has it) and revoke sessions.",
+      "Check what the attacker could have done: new inbox rules or forwarding (Exchange: Get-InboxRule -Mailbox <upn>), new app consents (OAuth grants page), new devices.",
+      "Prevent it: move the user to a passkey (MFA and SSO coverage page). Number matching is already on for Microsoft Authenticator; turn on 'Report suspicious activity' (Authentication methods > Settings) so users can flag prompts. With P1, a Conditional Access policy requiring phishing-resistant MFA stops push approvals entirely.",
+    ],
+    tools: ["detections", "posture"],
+    tags: ["incident", "mfa", "push", "fatigue"],
+  },
+  {
+    id: "incident-account-takeover",
+    title: "Incident: account takeover (sprayed or guessed password, legacy sign-in, new MFA method)",
+    protocols: ["saml", "oidc", "oauth"],
+    platforms: ["Microsoft Entra ID"],
+    symptom: "Detections flags a password spray with a success, many wrong passwords then a success, a legacy protocol sign-in, or new security info added right after a sign-in from a new country.",
+    meaning:
+      "Someone other than the user probably knows the password, and may have added their own MFA method so they keep access after a reset. Treat the account as compromised until you've ruled it out.",
+    causes: ["A weak or reused password.", "Legacy authentication (IMAP, POP, SMTP AUTH) still allowed, which never asks for MFA.", "No MFA registered, so the attacker registered their own."],
+    checks: [
+      "Sign-in logs for the user and for the attacking IP address: every success from it is another compromised account.",
+      "Audit logs > the user: 'User registered security info', 'Update user', 'Consent to application' since the first suspicious sign-in.",
+      "Security info for the user: remove any phone or authenticator the user doesn't recognise.",
+    ],
+    fixes: [
+      "Contain: Update-MgUser -UserId <upn> -AccountEnabled:$false if the attacker may still be active, then Revoke-MgUserSignInSession -UserId <upn>.",
+      "Reset the password and remove unknown sign-in methods (Get-MgUserAuthenticationMethod -UserId <upn>; remove the unknown one with the matching Remove-MgUserAuthentication*Method cmdlet). Re-enable the account and have the user register a passkey with a Temporary Access Pass.",
+      "Look for what the attacker set up: inbox rules and forwarding, app consents (OAuth grants page), registered devices, new app credentials if the user is an admin.",
+      "Stop the next one: block legacy authentication (security defaults do this on Free; with P1, a Conditional Access policy for 'Other clients'), turn on password protection with a custom banned list, and with P1 block the attacking addresses or countries with named locations.",
+    ],
+    tools: ["detections", "grants", "posture"],
+    tags: ["incident", "spray", "brute force", "legacy auth", "account takeover"],
+  },
+  {
+    id: "incident-token-theft",
+    title: "Incident: stolen session token (cookie or refresh token replay)",
+    protocols: ["oidc", "oauth", "saml"],
+    platforms: ["Microsoft Entra ID"],
+    symptom: "Detections shows one sign-in session used from two countries, often the second as a non-interactive sign-in to Exchange or Graph.",
+    meaning:
+      "The attacker didn't sign in; they copied an already-signed-in session (from an adversary-in-the-middle phishing page or infostealer malware) and are replaying it. MFA was already satisfied, so it isn't asked again. A password reset alone doesn't end it.",
+    causes: ["The user signed in through a fake page that proxied the real Microsoft sign-in.", "Malware on the user's device copied browser cookies or tokens."],
+    checks: [
+      "Sign-in logs (interactive and non-interactive) filtered by the Session ID: every address and app that used it.",
+      "Was the first sign-in of the session from an unusual address (the phishing proxy)?",
+      "The user's device: EDR alerts for infostealers around the same time.",
+    ],
+    fixes: [
+      "Revoke-MgUserSignInSession -UserId <upn> right away; this invalidates refresh tokens and session cookies. Continuous access evaluation makes Exchange, SharePoint and Teams honour it within minutes.",
+      "Reset the password and review security info, inbox rules and app consents as for account takeover.",
+      "Clean or re-image the device if malware is suspected; its saved sessions are the source.",
+      "Prevent it: phishing-resistant MFA stops proxy phishing (MFA and SSO coverage page). With P1, require a compliant or hybrid-joined device, and turn on Token Protection (sign-in session binding) for supported Windows apps.",
+    ],
+    tools: ["detections", "posture"],
+    tags: ["incident", "token theft", "session", "aitm", "replay"],
+  },
+  // ---------- OAuth grant governance ----------
+  {
+    id: "oauth-risky-grant",
+    title: "An app holds a risky permission: review and remove it",
+    protocols: ["oauth", "oidc"],
+    platforms: ["Microsoft Entra ID"],
+    symptom: "The OAuth grants page or Overview says an app can take over the tenant, reads everyone's data, has powerful permissions and no owner, or still holds a permission it no longer asks for.",
+    meaning:
+      "Once a permission is granted, the app can use it every time it gets a token, until someone removes it. Application permissions work for every user with nobody signed in. A few of them (assigning roles, adding credentials to other apps, granting app permissions) let an app give itself everything else, so a leaked secret for that app is a leaked tenant.",
+    causes: [
+      "Someone granted a broad permission while testing and never removed it.",
+      "The vendor asked for more than the integration needs, and an admin clicked Grant admin consent.",
+      "The app was rewritten and stopped using a permission, but the old consent stayed in the tenant.",
+      "The owner left, so nobody reviews the app any more.",
+    ],
+    checks: [
+      "OAuth grants page: filter by Critical and High, and read the Why column.",
+      "Enterprise applications > the app > Security > Permissions: the Admin consent and User consent tabs list every grant.",
+      "Ask the owner which API calls the app makes. Compare them with Microsoft's Graph permissions reference to find the smallest permission that works (for example Sites.Selected instead of Sites.ReadWrite.All).",
+      "Sign-in logs > Service principal sign-ins (P1): is the app still signing in at all?",
+    ],
+    fixes: [
+      "Application permission: App registrations > the app > API permissions > the permission > Remove permission, then Grant admin consent again. In PowerShell: Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId <enterprise-app-object-id> | Where-Object AppRoleId -eq '<role-id>' | ForEach-Object { Remove-MgServicePrincipalAppRoleAssignment -ServicePrincipalId <enterprise-app-object-id> -AppRoleAssignmentId $_.Id }",
+      "Delegated permission granted by an admin: Get-MgOauth2PermissionGrant -Filter \"clientId eq '<enterprise-app-object-id>'\" lists the grants. Update-MgOauth2PermissionGrant -OAuth2PermissionGrantId <id> -Scope 'openid profile User.Read' keeps only what is needed; Remove-MgOauth2PermissionGrant -OAuth2PermissionGrantId <id> removes the grant.",
+      "Can't remove it yet: give the app an owner, move its secret to a certificate or a managed identity, and limit mailbox access with an Exchange application access policy or RBAC for Applications.",
+      "Suspect it was abused: disable sign-in for the app first (Update-MgServicePrincipal -ServicePrincipalId <id> -AccountEnabled:$false), then remove its credentials and grants, then read the audit log for what it changed.",
+    ],
+    tools: ["grants", "inventory", "discover"],
+    tags: ["consent", "permissions", "least privilege", "oauth"],
+  },
+  {
+    id: "oauth-user-consent",
+    title: "Shadow IT: users consented to a third-party app on their own",
+    protocols: ["oauth", "oidc"],
+    platforms: ["Microsoft Entra ID"],
+    symptom: "The OAuth grants page shows a third-party app with permissions such as Mail.Read, Files.Read.All or Mail.Send that users approved themselves (consent: users themselves).",
+    meaning:
+      "When user consent is allowed, anyone can click Accept on a consent screen and give an outside app access to their mail and files, with no IT review. Attackers use the same screen for consent phishing: the app looks legitimate, the user accepts, and the attacker reads mail with a refresh token that survives a password reset.",
+    causes: [
+      "User consent settings still allow consent for apps from any publisher.",
+      "A popular tool (meeting notes, AI assistant, scheduling, e-signature) spread from person to person.",
+      "A phishing email linked to a malicious app's consent screen.",
+    ],
+    checks: [
+      "OAuth grants page: which users-themselves grants are rated High or Critical, and how many users accepted.",
+      "Enterprise applications > the app > Security > Permissions > User consent: who consented.",
+      "Audit logs: activity 'Consent to application' shows when and from where each user consented.",
+      "Is the publisher verified (blue badge on the consent screen and on the enterprise app)?",
+    ],
+    fixes: [
+      "Malicious or unknown: disable sign-in for the enterprise app, remove the grants, revoke the users' sessions (Revoke-MgUserSignInSession -UserId <upn>) and check their mailboxes for new inbox rules or forwarding.",
+      "Legitimate and wanted: review the permissions with the vendor, then grant admin consent for only what is needed, assign it to the people who need it (Properties > Assignment required = Yes) and give it an owner.",
+      "Stop it happening again: Enterprise applications > Consent and permissions > User consent settings > 'Allow user consent for apps from verified publishers, for selected permissions' or 'Do not allow user consent'. Free on every tenant.",
+      "Give users a way to ask: Enterprise applications > Consent and permissions > Admin consent settings > Users can request admin consent to apps they are unable to consent to = Yes, and name the reviewers.",
+    ],
+    tools: ["grants"],
+    tags: ["consent", "shadow it", "phishing", "oauth"],
+  },
 ];
 
 export const playbookById = (id: string) => PLAYBOOKS.find((p) => p.id === id);

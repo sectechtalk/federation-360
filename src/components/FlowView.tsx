@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
-import { CodeBlock, FindingList, SummaryBar, useApp } from "./ui";
+import { CodeBlock, FindingList, SummaryBar } from "./ui";
+import { ActionButton, BusyNote, downloadFile } from "./busy";
 import { ACTOR_LABEL, KIND_LABEL, analyzeCapture, redactCapture, type FlowAnalysis, type FlowCapture } from "../lib/flow";
 import { CLAIM_HELP } from "../lib/jwt";
 import { worst } from "../lib/health";
@@ -21,40 +22,38 @@ function prettyXml(xml: string) {
     .join("\n");
 }
 
-export function downloadJson(name: string, data: unknown) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 /** The timeline, decoded messages and findings for one sign-in flow. */
-export function FlowView({ capture }: { capture: FlowCapture }) {
-  const { toast } = useApp();
-  const [a, setA] = useState<FlowAnalysis | null>(null);
+export function FlowView({ capture: latest }: { capture: FlowCapture }) {
+  // The analysis and the capture it was made from. While a newer capture is being analyzed (a live sign-in that just
+  // gained a hop) the previous one stays on screen, so the timeline never pairs hops with another capture's results.
+  const [done, setDone] = useState<{ capture: FlowCapture; a: FlowAnalysis } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
-    setA(null);
-    analyzeCapture(capture).then(
-      (r) => live && setA(r),
+    setErr(null);
+    analyzeCapture(latest).then(
+      (r) => live && setDone({ capture: latest, a: r }),
       (e) => live && setErr(String(e?.message ?? e)),
     );
     return () => {
       live = false;
     };
-  }, [capture]);
+  }, [latest]);
+
+  // A different flow (not a newer copy of the same one) shows "Analyzing…" instead of the old flow.
+  const current = done && done.capture.id === latest.id ? done : null;
+  const capture = current?.capture ?? latest;
+  const a = current?.a ?? null;
 
   const download = async () => {
-    downloadJson(`f360-capture-${capture.id}.json`, await redactCapture(capture));
-    toast("Saved with codes, token signatures and SAML signature values removed");
+    const name = `f360-capture-${capture.id}.json`;
+    const msg = downloadFile(name, JSON.stringify(await redactCapture(capture), null, 2), "application/json");
+    return `${msg} Codes, token signatures and SAML signature values were removed.`;
   };
 
   if (err) return <div className="callout warn">Couldn't analyze this flow: {err}</div>;
-  if (!a) return <p className="muted">Analyzing…</p>;
+  if (!a) return <BusyNote className="muted">Analyzing the sign-in…</BusyNote>;
   const all = [...a.overall, ...a.steps.flatMap((s) => s.findings)];
 
   return (
@@ -67,7 +66,7 @@ export function FlowView({ capture }: { capture: FlowCapture }) {
           </div>
           <div className="row">
             <SummaryBar findings={all} />
-            <button className="btn sm" onClick={download}>Download redacted copy</button>
+            <ActionButton className="btn sm" busy="Redacting…" onClick={download}>Download redacted copy</ActionButton>
           </div>
         </div>
         <FindingList findings={a.overall} />

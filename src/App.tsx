@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Ctx, useToastState, type AppCtx } from "./components/ui";
+import { useClickAck } from "./components/busy";
 import { useCollection, useStore } from "./lib/store";
 import type { AppIntegration, Tenant } from "./lib/types";
 import { exampleData } from "./data/seed";
@@ -18,6 +19,9 @@ import Discover from "./views/Discover";
 import FlowTracer from "./views/FlowTracer";
 import LiveTest from "./views/LiveTest";
 import Connectivity from "./views/Connectivity";
+import Grants from "./views/Grants";
+import Posture from "./views/Posture";
+import Detections from "./views/Detections";
 import { AppSwitcher, NavIcon, NavSection, ThemeToggle, useNavDrawer } from "./360/Shell360";
 
 const ROUTES = [
@@ -26,6 +30,9 @@ const ROUTES = [
   { id: "inventory", label: "Inventory", group: "Manage", icon: "boxes", el: Inventory },
   { id: "discover", label: "Discover", group: "Manage", icon: "compass", el: Discover },
   { id: "wizards", label: "Setup wizards", group: "Manage", icon: "wand-sparkles", el: Wizards },
+  { id: "posture", label: "MFA and SSO coverage", group: "Protect", icon: "fingerprint", el: Posture },
+  { id: "grants", label: "OAuth grants", group: "Protect", icon: "key-round", el: Grants },
+  { id: "detections", label: "Detections", group: "Protect", icon: "siren", el: Detections },
   { id: "flowtracer", label: "Flow tracer", group: "Troubleshoot", icon: "radar", el: FlowTracer },
   { id: "livetest", label: "Live test", group: "Troubleshoot", icon: "test-tube", el: LiveTest },
   { id: "connectivity", label: "Connectivity test", group: "Troubleshoot", icon: "monitor-dot", el: Connectivity },
@@ -64,6 +71,7 @@ export default function App() {
   const a = useCollection<AppIntegration>(store, "apps");
   const { msg, toast } = useToastState();
   const menuButton = useNavDrawer("rail");
+  useClickAck(toast);
 
   useEffect(() => {
     const on = () => setRoute(routeFromHash());
@@ -104,20 +112,22 @@ export default function App() {
         if (location.hash !== "#" + r) location.hash = r;
         else setRoute(r);
         window.scrollTo({ top: 0 });
+        // Every button gives feedback: a button that opens another page says which one.
+        toast("Opened " + (ROUTES.find((x) => x.id === r)?.label ?? r));
       },
       toast,
       loadExamples: async () => {
-        if (!store) return;
+        if (!store) throw new Error("Storage isn't connected yet. Wait a moment and try again.");
         const d = exampleData();
         await Promise.all([...d.tenants.map((x) => store.put("tenants", x)), ...d.apps.map((x) => store.put("apps", x))]);
-        toast("Example tenants and apps added");
+        return `Added ${d.tenants.length} example tenants and ${d.apps.length} example apps`;
       },
     }),
     [store, t.rows, a.rows, params],
   );
 
   const View = ROUTES.find((r) => r.id === route)!.el;
-  const groups = ["Getting started", "Manage", "Troubleshoot", "Learn"];
+  const groups = ["Getting started", "Manage", "Protect", "Troubleshoot", "Learn"];
 
   return (
     <Ctx.Provider value={ctx}>
@@ -146,7 +156,7 @@ export default function App() {
           </div>
           <div className="rail-foot">
             <span>{store ? (store.kind === "cloud" ? "Inventory saved to this artifact" : "Inventory saved in this browser") : "Connecting storage…"}</span>
-            <span>Tokens, assertions and SCIM messages you paste stay on this page. Discover talks only to Microsoft, read-only, and only when you sign in. Flow tracer reads HAR files in this tab; Live test talks only to Microsoft and the lab test app on your PC. Connectivity test results you drop in stay on this page.</span>
+            <span>Tokens, assertions and SCIM messages you paste stay on this page. Discover talks only to Microsoft, read-only, and only when you sign in. Flow tracer reads recordings in this tab, and the Capture extension hands it sign-ins from this browser only; Live test talks only to Microsoft and the lab test app on your PC. Connectivity test results you drop in stay on this page.</span>
           </div>
         </nav>
         <main className="main">

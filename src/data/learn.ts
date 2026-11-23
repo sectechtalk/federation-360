@@ -149,6 +149,11 @@ export const GLOSSARY: { term: string; protocols: ProtocolId[]; def: string }[] 
   { term: "Scope (provisioning)", protocols: ["scim"], def: "Which users Entra sends to the app: only those assigned to it, or everyone. Different from an OAuth scope." },
   { term: "Quarantine", protocols: ["scim"], def: "Entra's slow mode for a provisioning job whose calls keep failing. It retries about once a day until the cause is fixed and the job is restarted." },
   { term: "PatchOp", protocols: ["scim"], def: "The SCIM message for a partial update: a list of add, replace and remove operations, each with a path and a value." },
+  { term: "Primary Refresh Token (PRT)", protocols: ["saml", "oidc", "oauth"], def: "A device-bound token Entra issues to the sign-in broker on a joined or registered Mac, Windows PC, iPhone, Android or Linux device. The broker uses it to get each app its own token silently. Apps never see it. See Device SSO above." },
+  { term: "Platform SSO (macOS)", protocols: ["saml", "oidc", "oauth"], def: "Apple's macOS feature that lets a Mac sign in with an Entra account. Deployed by Intune or another MDM, with the Microsoft Enterprise SSO plug-in doing the Entra registration. Produces a hardware-bound PRT." },
+  { term: "Microsoft Enterprise SSO plug-in", protocols: ["saml", "oidc", "oauth"], def: "Microsoft's SSO extension for Apple devices, shipped in Company Portal on macOS. It registers the device with Entra and uses the PRT to answer app and browser sign-ins." },
+  { term: "Web Account Manager (WAM)", protocols: ["oidc", "oauth"], def: "The Windows sign-in broker. Apps ask WAM for tokens, and WAM uses the PRT so the user isn't prompted. It keeps refresh tokens itself and hands apps only access tokens." },
+  { term: "Kerberos TGT (cloud and on-premises)", protocols: [], def: "A Kerberos ticket-granting ticket. With Platform SSO, Entra can return a cloud TGT and an on-premises AD TGT alongside the PRT, so file shares and intranet sites open without a prompt." },
   { term: "JIT provisioning", protocols: ["saml", "oidc"], def: "Just-in-time: the app creates the account on first sign-in from the assertion's attributes. Simple, but doesn't remove leavers." },
 ];
 

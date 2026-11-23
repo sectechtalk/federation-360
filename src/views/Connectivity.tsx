@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { CodeBlock, copyText, useApp } from "../components/ui";
+import { CodeBlock, useApp } from "../components/ui";
+import { ActionButton, BusyNote, copyNow, downloadFile } from "../components/busy";
 import scriptTemplate from "../../connectivity/Test-F360Connectivity.ps1?raw";
 import {
   REMEDIATE_SCRIPT,
@@ -27,13 +28,7 @@ function Status({ s }: { s: ResultStatus }) {
   );
 }
 
-function save(name: string, text: string, type = "text/plain") {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([text], { type }));
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
+const save = (name: string, text: string, type = "text/plain") => downloadFile(name, text, type);
 
 const hostOf = (u: string) => {
   try {
@@ -72,10 +67,18 @@ export default function Connectivity() {
     return !urls.some((u) => isTestableHost(hostOf(u)));
   });
 
+  const [reading, setReading] = useState<string | null>(null);
   const readFiles = async (list: FileList | null) => {
-    if (!list) return;
-    const texts = await Promise.all([...list].map((f) => f.text()));
-    setFiles((cur) => [...cur, ...texts]);
+    if (!list || !list.length) return;
+    setReading(`Reading ${list.length} file${list.length === 1 ? "" : "s"}…`);
+    try {
+      const texts = await Promise.all([...list].map((f) => f.text()));
+      setFiles((cur) => [...cur, ...texts]);
+      toast(`Read ${texts.length} file${texts.length === 1 ? "" : "s"}`);
+    } catch (e: any) {
+      toast("Couldn't read the files: " + (e?.message ?? e));
+    }
+    setReading(null);
   };
 
   const localRun = `cd ${WORKDIR}
@@ -172,8 +175,8 @@ explorer.exe "/select,$($f.FullName)"`;
       <section className="panel stack">
         <div className="panel-head"><h2>3. Try it on this PC</h2><span className="sub">Optional, before you send it to devices</span></div>
         <div className="row">
-          <button className="btn primary" disabled={!plan.tests.length} onClick={() => save(planFile, JSON.stringify(plan, null, 2), "application/json")}>Download {planFile}</button>
-          <button className="btn" disabled={!plan.tests.length} onClick={() => copyText(JSON.stringify(plan, null, 2), toast)}>Copy plan JSON</button>
+          <ActionButton className="btn primary" busy="Building plan…" disabled={!plan.tests.length} onClick={() => save(planFile, JSON.stringify(plan, null, 2), "application/json")}>Download {planFile}</ActionButton>
+          <ActionButton busy="Copying…" disabled={!plan.tests.length} onClick={() => copyNow(JSON.stringify(plan, null, 2))}>Copy plan JSON</ActionButton>
         </div>
         <p className="small" style={{ margin: 0 }}>The file lands in your Downloads folder. Then paste this into PowerShell 7. It runs the script from the folder you cloned Federation 360 into, prints a summary line and the full path of the result file, and opens File Explorer with that file selected. Drag the file onto the box in step 5, or use Choose files there.</p>
         <CodeBlock code={localRun} />
@@ -182,9 +185,9 @@ explorer.exe "/select,$($f.FullName)"`;
       <section className="panel stack">
         <div className="panel-head"><h2>4. Send it to devices through Remediation 360</h2><span className="sub">Signed, four-eyes, canary first</span></div>
         <div className="row">
-          <button className="btn primary" disabled={!plan.tests.length} onClick={() => save("detect.ps1", detect)}>Download detect.ps1</button>
-          <button className="btn" onClick={() => save("remediate.ps1", REMEDIATE_SCRIPT)}>Download remediate.ps1</button>
-          <button className="btn" disabled={!plan.tests.length} onClick={() => copyText(detect, toast)}>Copy detect.ps1</button>
+          <ActionButton className="btn primary" busy="Building script…" disabled={!plan.tests.length} onClick={() => save("detect.ps1", detect)}>Download detect.ps1</ActionButton>
+          <ActionButton busy="Preparing download…" onClick={() => save("remediate.ps1", REMEDIATE_SCRIPT)}>Download remediate.ps1</ActionButton>
+          <ActionButton busy="Copying…" disabled={!plan.tests.length} onClick={() => copyNow(detect)}>Copy detect.ps1</ActionButton>
         </div>
         <p className="small" style={{ margin: 0 }}>
           detect.ps1 is the script with this plan built in, so the signed script and its plan can't drift apart. Changing the plan later means a new change in Remediation 360, approved and signed like any other.
@@ -215,7 +218,7 @@ explorer.exe "/select,$($f.FullName)"`;
                 <tr key={k}>
                   <th className="small" style={{ width: 220 }}>{k}</th>
                   <td className="small mono">{v}</td>
-                  <td style={{ width: 60 }}><button className="btn sm ghost" onClick={() => copyText(v, toast)}>Copy</button></td>
+                  <td style={{ width: 60 }}><ActionButton className="btn sm ghost" busy="Copying…" report="toast" onClick={() => copyNow(v)}>Copy</ActionButton></td>
                 </tr>
               ))}
             </tbody>
@@ -236,7 +239,7 @@ explorer.exe "/select,$($f.FullName)"`;
             Choose files
             <input type="file" multiple accept=".json,.csv,.txt" style={{ display: "none" }} onChange={(e) => readFiles(e.target.files)} />
           </label>
-          {(files.length > 0 || pasted) && <button className="btn ghost" onClick={() => { setFiles([]); setPasted(""); setOpenDevice(null); }}>Clear</button>}
+          {(files.length > 0 || pasted) && <button className="btn ghost" onClick={() => { setFiles([]); setPasted(""); setOpenDevice(null); toast("Results cleared from this page"); }}>Clear</button>}
         </div>
         <textarea
           className="input mono"
@@ -248,6 +251,7 @@ explorer.exe "/select,$($f.FullName)"`;
           placeholder="Paste or drop here"
           aria-label="Results"
         />
+        {reading && <BusyNote>{reading}</BusyNote>}
         {parsed.errors.map((e, i) => <div className="callout warn" key={i}>{e}</div>)}
 
         {parsed.reports.length > 0 && (

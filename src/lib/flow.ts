@@ -2,7 +2,8 @@
  * A sign-in flow as a list of hops, and the checks Federation 360 runs on it.
  *
  * The same shape comes from three places:
- *   - the Flow Tracer, which builds it from a HAR file recorded in the browser's developer tools
+ *   - the Flow Tracer, which builds it from a HAR file recorded in the browser's developer tools, or live from
+ *     the Federation 360 Capture browser extension (extension/)
  *   - the lab test app (lab/testapp/server.mjs), which records the SAML and client credentials runs it takes part in
  *   - the Live test page, which records the OIDC sign-ins it runs itself
  *
@@ -67,15 +68,32 @@ export interface FlowExpectations {
 
 export type FlowKind = "saml" | "oidc" | "oauth" | "client-credentials" | "unknown";
 
+/** What Federation 360 needs to find this sign-in in Entra's sign-in log. Collected from the recorded hops. */
+export interface EntraHints {
+  /** Tenant ID or domain from the sign-in URLs or the tokens. Not "common" or "organizations". */
+  tenant?: string;
+  /** x-ms-request-id values: the sign-in log's request ID. */
+  requestIds: string[];
+  /** client-request-id values and the error page's Correlation Id: the sign-in log's correlation ID. */
+  correlationIds: string[];
+  /** client_id values: the sign-in log's appId. */
+  clientIds: string[];
+  /** Time of the first and last identity provider hop. */
+  from?: string;
+  to?: string;
+}
+
 export interface FlowCapture {
   format: typeof CAPTURE_FORMAT;
   version: 1;
   id: string;
   kind: FlowKind;
-  source: "testapp" | "f360" | "har";
+  source: "testapp" | "f360" | "har" | "extension";
   title: string;
   startedAt: string;
   expect?: FlowExpectations;
+  /** Present when the flow went through Microsoft Entra ID. */
+  entra?: EntraHints;
   steps: FlowStep[];
 }
 

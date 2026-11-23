@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { useApp, FindingList, SummaryBar, Seg } from "../components/ui";
+import { ActionButton } from "../components/busy";
 import { checkDiscovery, checkSamlMetadata, jwksSummary, parseSamlMetadata, wellKnownUrls, type SamlMetadata } from "../lib/metadata";
 import { SAMPLE_DISCOVERY, SAMPLE_IDP_METADATA } from "../data/samples";
 import { PLATFORM_LABEL, type Finding } from "../lib/types";
@@ -89,16 +90,22 @@ export default function MetadataTool() {
   const tryFetch = async (u: string, m: Mode) => {
     setUrl(u);
     setMode(m);
-    setFetchMsg("Fetching…");
+    setFetchMsg(null);
+    let r: Response;
     try {
-      const r = await fetch(u);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      setText(await r.text());
-      setIsSample(false);
-      setFetchMsg("Loaded from " + u);
+      r = await fetch(u);
     } catch {
       setFetchMsg("This page can't reach that site directly (browser security blocks it). Open the link, copy everything on the page, and paste it below.");
+      throw new Error("Blocked by browser security. See the note below the table.");
     }
+    if (!r.ok) {
+      setFetchMsg(`The site answered HTTP ${r.status}. Open the link to check it, then copy everything on the page and paste it below.`);
+      throw new Error(`The site answered HTTP ${r.status}`);
+    }
+    setText(await r.text());
+    setIsSample(false);
+    setFetchMsg("Loaded from " + u);
+    return "Loaded";
   };
 
   const modeFor = (label: string): Mode => (/SAML|Federation metadata/i.test(label) ? "saml" : /JWKS|keys/i.test(label) ? "jwks" : "oidc");
@@ -129,7 +136,7 @@ export default function MetadataTool() {
                   <tr key={u.url}>
                     <td style={{ whiteSpace: "nowrap" }}>{u.label}</td>
                     <td className="mono small" style={{ overflowWrap: "anywhere" }}><a href={u.url} target="_blank" rel="noreferrer">{u.url}</a></td>
-                    <td><button className="btn sm" onClick={() => tryFetch(u.url, modeFor(u.label))}>Load</button></td>
+                    <td><ActionButton className="btn sm" busy="Fetching…" report="toast" onClick={() => tryFetch(u.url, modeFor(u.label))}>Load</ActionButton></td>
                   </tr>
                 ))}
               </tbody>
@@ -205,7 +212,7 @@ export default function MetadataTool() {
               <Fragment key={k}><dt>{k}</dt><dd>{[].concat(disc[k]).join(", ")}</dd></Fragment>
             ))}
           </dl>
-          {disc.jwks_uri && <div className="row" style={{ marginTop: 12 }}><button className="btn sm" onClick={() => tryFetch(disc.jwks_uri, "jwks")}>Load the JWKS</button></div>}
+          {disc.jwks_uri && <div className="row" style={{ marginTop: 12 }}><ActionButton className="btn sm" busy="Fetching…" onClick={() => tryFetch(disc.jwks_uri, "jwks")}>Load the JWKS</ActionButton></div>}
         </section>
       )}
 

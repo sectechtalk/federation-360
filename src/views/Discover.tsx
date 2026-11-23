@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CodeBlock, Field, ProtoChip, Seg, useApp } from "../components/ui";
+import { ActionButton, BusyNote, downloadFile } from "../components/busy";
 import { usePref } from "../lib/store";
 import { daysUntil } from "../lib/health";
 import {
@@ -35,7 +36,6 @@ function Preview({ snap, example, onDone, onDiscard }: { snap: DiscoverySnapshot
   const { tenants, apps, store, toast } = useApp();
   const plan = useMemo(() => planMerge(snap, tenants, apps, new Date(), { example }), [snap, tenants, apps, example]);
   const [flagMissing, setFlagMissing] = useState(true);
-  const [busy, setBusy] = useState(false);
 
   type Row = { action: "New" | "Update" | "Adopt" | "Same" | "Missing"; app: AppIntegration; changes?: string[] };
   const rows: Row[] = [
@@ -47,16 +47,16 @@ function Preview({ snap, example, onDone, onDiscard }: { snap: DiscoverySnapshot
   const writes = plan.creates.length + plan.updates.length + (flagMissing ? plan.missing.length : 0);
 
   const apply = async () => {
-    if (!store) return;
-    setBusy(true);
+    if (!store) throw new Error("Storage isn't connected yet. Wait a moment and try again.");
     try {
       await applyMerge(store, plan, { flagMissing });
-      toast(`Inventory updated: ${plan.creates.length} added, ${plan.updates.length} updated`);
-      onDone(plan.tenant.id);
     } catch (e: any) {
-      toast("Couldn't save: " + (e?.message ?? e));
-      setBusy(false);
+      throw new Error("Couldn't save: " + (e?.message ?? e));
     }
+    const msg = `Inventory updated: ${plan.creates.length} added, ${plan.updates.length} updated`;
+    onDone(plan.tenant.id);
+    toast(msg); // after the page change, so it isn't replaced by "Opened Inventory"
+    return msg;
   };
 
   return (
@@ -68,10 +68,10 @@ function Preview({ snap, example, onDone, onDiscard }: { snap: DiscoverySnapshot
           <span className="small mono">{snap.tenant.ref}{snap.tenant.domain && ` · ${snap.tenant.domain}`}</span>
         </div>
         <div className="row">
-          <button className="btn" onClick={onDiscard}>Discard</button>
-          <button className="btn primary" disabled={busy || !writes} onClick={apply}>
+          <button className="btn" onClick={() => { onDiscard(); toast("Scan discarded. Nothing was added to the inventory."); }}>Discard</button>
+          <ActionButton className="btn primary" busy="Saving to inventory…" disabled={!writes} onClick={apply}>
             {writes ? `Add to inventory (${writes} ${writes === 1 ? "change" : "changes"})` : "Inventory is already up to date"}
-          </button>
+          </ActionButton>
         </div>
       </div>
 
@@ -165,28 +165,35 @@ export default function Discover() {
 
   const onFile = async (f: File | undefined) => {
     if (!f) return;
+    setError(null);
+    setStatus(`Reading ${f.name}…`);
     try {
       load(JSON.parse((await f.text()).replace(/^﻿/, "")));
+      toast(`Loaded ${f.name}`);
     } catch (e: any) {
       setError(e instanceof SyntaxError ? "That file isn't valid JSON." : e.message);
     }
+    setStatus(null);
   };
 
   const download = () => {
-    if (!raw) return;
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(raw)], { type: "application/json" }));
-    a.download = `f360-entra-export-${raw.collectedAt.slice(0, 10)}.json`;
-    a.click();
+    if (!raw) throw new Error("There's no scan to save.");
+    return downloadFile(`f360-entra-export-${raw.collectedAt.slice(0, 10)}.json`, JSON.stringify(raw), "application/json");
   };
 
   const tidForScript = GUID.test(tenantId) ? tenantId : "<your-tenant-id>";
   const commands = `cd $HOME\\Downloads\nUnblock-File .\\${SCRIPT_NAME}\n.\\${SCRIPT_NAME} -TenantId ${tidForScript} -OutFile $HOME\\Downloads\\f360-entra-export.json`;
-  const downloadScript = () => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([exportScript], { type: "text/plain" }));
-    a.download = SCRIPT_NAME;
-    a.click();
+  const downloadScript = () => downloadFile(SCRIPT_NAME, exportScript);
+  const signIn = async () => {
+    setError(null);
+    await startSignIn({ tenantId, clientId, redirectUri });
+    // The browser normally leaves for Microsoft's sign-in page before this wait ends.
+    await new Promise((r) => setTimeout(r, 15000));
+    throw new Error("Microsoft's sign-in page didn't open. Check the tenant ID and client ID, then try again.");
+  };
+  const trySample = () => {
+    load(makeSampleEntraExport());
+    toast("Sample tenant loaded");
   };
   const canSignIn = !blocker && GUID.test(tenantId) && GUID.test(clientId);
 
@@ -208,11 +215,11 @@ export default function Discover() {
       ) : snap ? (
         <>
           <Preview snap={snap} example={raw?.collector === "sample"} onDiscard={() => { setSnap(null); setRaw(null); }} onDone={(t) => go("inventory", { tenant: t })} />
-          {raw?.collector === "browser" && <div><button className="btn sm" onClick={download}>Save this scan as a file</button></div>}
+          {raw?.collector === "browser" && <div><ActionButton className="btn sm" busy="Building file…" onClick={download}>Save this scan as a file</ActionButton></div>}
         </>
       ) : (
         <>
-          {status && <div className="callout" role="status">{status}</div>}
+          {status && <BusyNote>{status}</BusyNote>}
           {error && <div className="callout warn" role="alert">{error}</div>}
 
           <Field
@@ -222,7 +229,7 @@ export default function Discover() {
             onChange={setTenantId}
             placeholder="00000000-0000-0000-0000-000000000000"
             error={tenantId && !GUID.test(tenantId) ? "A tenant ID is a GUID, like 8f2b6c1e-0d4a-4a7e-9a51-3c0d2e7b9f10." : null}
-            hint={entraTenants.length ? <>From your inventory: {entraTenants.map((t, i) => <span key={t.id}>{i ? ", " : ""}<button className="btn ghost sm" onClick={() => setTenantId(t.tenantRef)}>{t.name}</button></span>)}</> : "Entra admin center > Entra ID > Overview > Tenant ID."}
+            hint={entraTenants.length ? <>From your inventory: {entraTenants.map((t, i) => <span key={t.id}>{i ? ", " : ""}<button className="btn ghost sm" onClick={() => { setTenantId(t.tenantRef); toast(`Tenant ID filled in from ${t.name}`); }}>{t.name}</button></span>)}</> : "Entra admin center > Entra ID > Overview > Tenant ID."}
           />
 
           <section className="panel stack">
@@ -235,7 +242,7 @@ export default function Discover() {
               The file holds names, IDs, URLs and dates. Graph never returns secret values, and the script drops certificate bodies too.
             </p>
             <div className="row">
-              <button className="btn" onClick={downloadScript}>Download {SCRIPT_NAME}</button>
+              <ActionButton busy="Preparing download…" onClick={downloadScript}>Download {SCRIPT_NAME}</ActionButton>
             </div>
             <p>Save it to your Downloads folder, then run these three lines in PowerShell 7. <span className="mono">Unblock-File</span> clears the "downloaded from the internet" mark so Windows lets it run.</p>
             <CodeBlock code={commands} />
@@ -272,17 +279,17 @@ export default function Discover() {
               </label>
             </div>
             <div className="row">
-              <button className="btn primary" disabled={!canSignIn} onClick={() => startSignIn({ tenantId, clientId, redirectUri }).catch((e) => setError(e.message))}>
+              <ActionButton className="btn primary" busy="Opening Microsoft sign-in…" disabled={!canSignIn} onClick={signIn}>
                 Sign in and scan
-              </button>
+              </ActionButton>
             </div>
           </section>
 
           <section className="panel spread">
             <span>No tenant handy? Try the preview with a fictional tenant shaped like the lab.</span>
-            <button className="btn" onClick={() => { try { load(makeSampleEntraExport()); toast("Sample tenant loaded"); } catch (e: any) { setError(e.message); } }}>
+            <ActionButton busy="Loading sample…" onClick={trySample}>
               Try with sample data
-            </button>
+            </ActionButton>
           </section>
         </>
       )}
