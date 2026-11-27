@@ -120,7 +120,7 @@ export function NavIcon({ name }: { name: string }) {
 
 // Collapsible rail section: an uppercase header button with a chevron over its page links, remembered per app
 // under f360.nav.collapsed like nav-sections.js in the other 360 apps. The section holding the current page always opens.
-export const NAV_COLLAPSE_KEY = "f360.nav.collapsed";
+export const NAV_COLLAPSE_KEY = "f360.nav.collapsed"; // gitleaks:allow (a browser storage key name, not a secret)
 const sectionKey = (title: string) => title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 function readCollapsed(): string[] {
   try {
