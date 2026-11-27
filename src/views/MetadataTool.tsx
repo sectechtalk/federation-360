@@ -5,6 +5,7 @@ import { checkDiscovery, checkSamlMetadata, jwksSummary, parseSamlMetadata, well
 import { SAMPLE_DISCOVERY, SAMPLE_IDP_METADATA } from "../data/samples";
 import { PLATFORM_LABEL, type Finding } from "../lib/types";
 import type { CertInfo } from "../lib/x509";
+import { Section } from "../components/Section";
 
 type Mode = "saml" | "oidc" | "jwks";
 
@@ -119,7 +120,7 @@ export default function MetadataTool() {
         </div>
       </div>
 
-      <section className="panel stack">
+      <Section className="panel stack">
         <div className="spread">
           <h3>Where to find it</h3>
           {tenants.length > 0 && (
@@ -146,28 +147,29 @@ export default function MetadataTool() {
           <p className="muted small">{tenant?.platform === "aws-idc" ? "AWS IAM Identity Center doesn't publish metadata at a public URL. Download it from IAM Identity Center > Settings > Identity source > Actions > Change identity source, and paste it below." : "No standard URLs for this platform. Paste the document below."}</p>
         )}
         {fetchMsg && <p className="small muted">{fetchMsg}</p>}
-      </section>
+      </Section>
 
-      <section className="panel stack">
+      <Section className="panel stack">
+        <h2>Check a metadata document</h2>
         <div className="spread">
           <Seg label="Document type" value={mode} onChange={switchMode} options={[{ v: "saml", l: "SAML metadata (XML)" }, { v: "oidc", l: "OIDC discovery (JSON)" }, { v: "jwks", l: "JWKS keys (JSON)" }]} />
           {isSample && <span className="example-flag">Example document</span>}
         </div>
         <textarea aria-label="Metadata document" className="input" rows={8} value={text} onChange={(e) => { setText(e.target.value); setIsSample(false); }} spellCheck={false} placeholder={mode === "saml" ? "<EntityDescriptor …>" : "{ … }"} />
-      </section>
+      </Section>
 
       {error && <div className="callout warn">{error}</div>}
 
       {findings.length > 0 && (
-        <section className="stack">
+        <Section className="stack">
           <div className="spread"><h2>Findings</h2><SummaryBar findings={findings} /></div>
           <FindingList findings={findings} />
-        </section>
+        </Section>
       )}
 
       {samlMd && (
         <div className="grid-2">
-          <section className="panel stack">
+          <Section className="panel stack">
             <div className="panel-head"><h2>Endpoints</h2><span className="sub">{samlMd.roles.join(" + ")}</span></div>
             <div className="table-wrap">
               <table>
@@ -180,8 +182,8 @@ export default function MetadataTool() {
               </table>
             </div>
             {samlMd.nameIdFormats.length > 0 && <p className="small"><strong>NameID formats:</strong> {samlMd.nameIdFormats.map((n) => n.split(":").pop()).join(", ")}</p>}
-          </section>
-          <section className="panel stack">
+          </Section>
+          <Section className="panel stack">
             <div className="panel-head"><h2>Certificates</h2><span className="sub">{samlMd.certs.length}</span></div>
             {samlMd.certs.map((c, i) => (
               <dl className="kv" key={i}>
@@ -197,12 +199,12 @@ export default function MetadataTool() {
                 ) : <><dt>Error</dt><dd>{c.error}</dd></>}
               </dl>
             ))}
-          </section>
+          </Section>
         </div>
       )}
 
       {disc && (
-        <section className="panel">
+        <Section className="panel">
           <div className="panel-head"><h2>Discovery document</h2></div>
           <dl className="kv">
             {["issuer", "authorization_endpoint", "token_endpoint", "jwks_uri", "userinfo_endpoint", "end_session_endpoint", "device_authorization_endpoint"].filter((k) => disc[k]).map((k) => (
@@ -213,7 +215,7 @@ export default function MetadataTool() {
             ))}
           </dl>
           {disc.jwks_uri && <div className="row" style={{ marginTop: 12 }}><ActionButton className="btn sm" busy="Fetching…" onClick={() => tryFetch(disc.jwks_uri, "jwks")}>Load the JWKS</ActionButton></div>}
-        </section>
+        </Section>
       )}
 
       {keys.length > 0 && (

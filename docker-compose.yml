@@ -37,6 +37,8 @@ services:
     image: node:22-alpine
     working_dir: /app
     command: ["node", "lab/testapp/server.mjs"]
+    # Always up while Docker runs locally, like dev, unless stopped by hand.
+    restart: unless-stopped
     ports:
       - "127.0.0.1:5174:5174"
     volumes:

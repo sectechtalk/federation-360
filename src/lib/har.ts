@@ -33,9 +33,12 @@ export const IDP_HOSTS = [
   /(^|\.)portal\.sso\.[a-z0-9-]+\.amazonaws\.com$/i,
 ];
 
-/** Parameters worth showing. Secrets are replaced with "(present)". */
-const KEEP = ["client_id", "response_type", "response_mode", "scope", "redirect_uri", "state", "nonce", "prompt", "login_hint", "domain_hint", "code_challenge_method", "grant_type", "resource", "RelayState", "SigAlg", "error", "error_description", "error_uri", "session_state"];
-const SECRET = ["code_verifier", "client_secret", "client_assertion", "refresh_token", "password", "code_challenge"];
+/**
+ * Parameters worth showing. Secrets are replaced with "(present)". The capture extension holds only these fields of a
+ * posted form (SHOWN_FIELDS and SECRET_FIELDS in extension/capture-core.js; tests/browser-capture.test.ts checks).
+ */
+export const KEEP = ["client_id", "response_type", "response_mode", "scope", "redirect_uri", "state", "nonce", "prompt", "login_hint", "domain_hint", "code_challenge_method", "grant_type", "resource", "RelayState", "SigAlg", "error", "error_description", "error_uri", "session_state"];
+export const SECRET = ["code_verifier", "client_secret", "client_assertion", "refresh_token", "password", "code_challenge"];
 
 const header = (hs: HarHeader[] | undefined, name: string) => hs?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value;
 

@@ -1,5 +1,6 @@
 import { CodeBlock, ProtoChip, useApp } from "../components/ui";
 import { LAB_BUILDS, LAB_REPO, LAB_STEPS } from "../data/lab";
+import { Section } from "../components/Section";
 
 const linkify = (text: string) =>
   text.split(/(https?:\/\/[^\s)]+)/g).map((part, i) =>
@@ -30,7 +31,7 @@ export default function Lab() {
         <strong>Use a tenant made only for this.</strong> Never run the kit against a production tenant. It costs nothing as long as the lab tenant has no Azure subscription or paid licences.
       </div>
 
-      <section className="stack">
+      <Section className="stack">
         <h2>What gets built</h2>
         <div className="table-wrap">
           <table>
@@ -47,9 +48,9 @@ export default function Lab() {
           </table>
         </div>
         <p className="small muted">No client secrets are created, so the Terraform state holds nothing sensitive.</p>
-      </section>
+      </Section>
 
-      <section className="stack">
+      <Section className="stack">
         <h2>Steps</h2>
         {LAB_STEPS.map((s, i) => (
           <div key={s.title} className="panel stack">
@@ -73,7 +74,7 @@ export default function Lab() {
             {s.note && <div className="callout small">{linkify(s.note)}</div>}
           </div>
         ))}
-      </section>
+      </Section>
 
       <div className="row">
         <button className="btn" onClick={() => go("inventory")}>Open Inventory to import</button>

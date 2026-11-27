@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTenantClient } from "../components/tenantSignIn";
 import { CodeBlock, Field, ProtoChip, Seg, useApp } from "../components/ui";
 import { ActionButton, BusyNote, downloadFile } from "../components/busy";
-import { usePref } from "../lib/store";
 import { daysUntil } from "../lib/health";
 import {
   collectEntraExport, entraAdapter, GRAPH_SCOPES, makeSampleEntraExport,
@@ -11,6 +11,7 @@ import { browserSignInBlocker, currentRedirectUri, redeemCode, startSignIn, take
 import { applyMerge, planMerge } from "../lib/discovery/merge";
 import type { AppIntegration, DiscoveryInfo } from "../lib/types";
 import exportScript from "@sectechtalk/f360-collector/powershell/Export-F360EntraInventory.ps1?raw";
+import { Section } from "../components/Section";
 
 const SCRIPT_NAME = "Export-F360EntraInventory.ps1";
 
@@ -60,7 +61,7 @@ function Preview({ snap, example, onDone, onDiscard }: { snap: DiscoverySnapshot
   };
 
   return (
-    <section className="panel stack">
+    <Section className="panel stack">
       <div className="spread">
         <div>
           <div className="eyebrow">Scan result · {new Date(snap.collectedAt).toLocaleString()}</div>
@@ -116,7 +117,7 @@ function Preview({ snap, example, onDone, onDiscard }: { snap: DiscoverySnapshot
       <p className="small muted">
         The tenant's values replace names, identifiers, URLs, credentials and owners. Your status, environment, provisioning, SCIM settings and notes are kept.
       </p>
-    </section>
+    </Section>
   );
 }
 
@@ -124,8 +125,7 @@ export default function Discover() {
   const { tenants, go, toast } = useApp();
   const [provider, setProvider] = useState<"entra" | "okta">("entra");
   const entraTenants = tenants.filter((t) => t.platform === "entra" && GUID.test(t.tenantRef) && !t.example);
-  const [tenantId, setTenantId] = usePref("discover:tenantId", entraTenants[0]?.tenantRef ?? "");
-  const [clientId, setClientId] = usePref("discover:clientId", "");
+  const [tenantId, setTenantId, clientId, setClientId] = useTenantClient(entraTenants[0]?.tenantRef ?? "");
   const [snap, setSnap] = useState<DiscoverySnapshot | null>(null);
   const [raw, setRaw] = useState<EntraExport | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -232,7 +232,7 @@ export default function Discover() {
             hint={entraTenants.length ? <>From your inventory: {entraTenants.map((t, i) => <span key={t.id}>{i ? ", " : ""}<button className="btn ghost sm" onClick={() => { setTenantId(t.tenantRef); toast(`Tenant ID filled in from ${t.name}`); }}>{t.name}</button></span>)}</> : "Entra admin center > Entra ID > Overview > Tenant ID."}
           />
 
-          <section className="panel stack">
+          <Section className="panel stack">
             <div>
               <div className="eyebrow">Option 1 · works everywhere, including the Claude artifact</div>
               <h2>Run the export script, then load its file</h2>
@@ -258,9 +258,9 @@ export default function Discover() {
               <span>Load export file</span>
               <input id="d-file" className="input" type="file" accept=".json,application/json" onChange={(e) => onFile(e.target.files?.[0])} />
             </label>
-          </section>
+          </Section>
 
-          <section className="panel stack">
+          <Section className="panel stack">
             <div>
               <div className="eyebrow">Option 2 · when Federation 360 runs on localhost or your own site</div>
               <h2>Sign in and scan from this page</h2>
@@ -283,14 +283,17 @@ export default function Discover() {
                 Sign in and scan
               </ActionButton>
             </div>
-          </section>
+          </Section>
 
-          <section className="panel spread">
+          <Section className="panel stack">
+            <h2>No tenant handy?</h2>
+            <div className="spread">
             <span>No tenant handy? Try the preview with a fictional tenant shaped like the lab.</span>
             <ActionButton busy="Loading sample…" onClick={trySample}>
               Try with sample data
             </ActionButton>
-          </section>
+          </div>
+          </Section>
         </>
       )}
     </div>

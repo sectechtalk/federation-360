@@ -69,12 +69,34 @@ export interface AppIntegration {
   oidc: OidcSettings;
   /** Present when provisioning is "scim". Older saved entries don't have it. */
   scim?: ScimSettings;
+  /** What the app's vendor says about its own session (Entra can't see it). Typed in from vendor docs. */
+  profile?: AppProfile;
   /** Present when the entry came from live tenant discovery. Read-only facts from the identity provider. */
   discovery?: DiscoveryInfo;
   notes: string;
   example?: boolean;
   updatedAt: string;
 }
+
+export type YesNoUnknown = "yes" | "no" | "unknown";
+
+/** Declared app profile: facts only the app knows, from its vendor's docs. Marked "declared" wherever shown. */
+export interface AppProfile {
+  /** Longest a session in the app lasts before it asks Entra again, in minutes. */
+  sessionMinutes?: number;
+  /** Idle timeout in minutes. */
+  idleMinutes?: number;
+  /** Does the app end the user's open sessions when SCIM sets active=false? */
+  endsSessionOnScimDisable: YesNoUnknown;
+  /** Does the app support single logout (SAML SLO or OIDC front/back-channel logout)? */
+  singleLogout: YesNoUnknown;
+  /** Does the app honour continuous access evaluation? Only Microsoft's own services do today. */
+  cae: YesNoUnknown;
+  /** Where the facts came from, e.g. the vendor doc URL. */
+  source: string;
+}
+
+export const emptyProfile = (): AppProfile => ({ endsSessionOnScimDisable: "unknown", singleLogout: "unknown", cae: "unknown", source: "" });
 
 // Discovery facts come from the shared collector package (also used by certificates-360).
 export type { DiscoveryProvider, DiscoveredCredential, DiscoveredPermission, DiscoveryInfo } from "@sectechtalk/f360-collector";

@@ -54,6 +54,7 @@ export function exampleData(): { tenants: Tenant[]; apps: AppIntegration[] } {
       owner: "Finance Apps team",
       saml: { ...emptySaml(), entityId: "https://expenses.contoso.example/saml/metadata", acsUrl: "https://expenses.contoso.example/saml/acs", signOnUrl: "https://expenses.contoso.example/login", idpEntityId: `https://sts.windows.net/${EXAMPLE_TENANT_ID}/`, certThumbprint: "749A276BF39BC76DFAA117BB9F8605D526A5B63F", certExpires: day(1094) },
       provisioning: "jit",
+      profile: { sessionMinutes: 480, idleMinutes: 60, endsSessionOnScimDisable: "no", singleLogout: "no", cae: "no", source: "Example vendor admin guide (made up)" },
       notes: "Gallery-less SAML app. Use this one with the SAML decoder samples.",
     }),
     base({
@@ -63,6 +64,7 @@ export function exampleData(): { tenants: Tenant[]; apps: AppIntegration[] } {
       saml: { ...emptySaml(), entityId: "https://us-east-1.signin.aws.amazon.com/platform/saml/d-9067000000", acsUrl: "https://us-east-1.signin.aws.amazon.com/platform/saml/acs/1a2b3c4d-example", signOnUrl: "https://d-9067000000.awsapps.com/start", idpEntityId: `https://sts.windows.net/${EXAMPLE_TENANT_ID}/`, nameIdFormat: "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress", certThumbprint: "0E24FD3E6EFE4791B1836C578E37C358511533F8", certExpires: day(20) },
       provisioning: "scim",
       scim: { endpoint: "https://scim.us-east-1.amazonaws.com/a1b2c3d4-example/scim/v2", tokenExpires: day(24), matchAttribute: "userName", userNameSource: "userPrincipalName" },
+      profile: { sessionMinutes: 480, endsSessionOnScimDisable: "yes", singleLogout: "no", cae: "no", source: "Example values (made up)" },
       notes: "SCIM token in IAM Identity Center expires yearly. Example data.",
     }),
     base({
@@ -82,6 +84,7 @@ export function exampleData(): { tenants: Tenant[]; apps: AppIntegration[] } {
       owner: "Digital team",
       oidc: { ...emptyOidc(), clientId: "5d1e2f3a-4b5c-4d6e-8f70-819203a4b5c6", redirectUris: "https://partners.contoso.example/signin-oidc", clientType: "confidential", grantType: "authorization_code", scopes: "openid profile email offline_access", audience: "5d1e2f3a-4b5c-4d6e-8f70-819203a4b5c6", issuer: `https://login.microsoftonline.com/${EXAMPLE_TENANT_ID}/v2.0`, secretExpires: day(-5) },
       status: "live",
+      profile: { sessionMinutes: 20160, idleMinutes: 0, endsSessionOnScimDisable: "no", singleLogout: "yes", cae: "no", source: "Example: \"Keep me signed in\" lasts 14 days (made up)" },
     }),
     base({
       id: "ex-payroll",

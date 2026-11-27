@@ -25,7 +25,8 @@ It runs in your browser. Nothing you paste into it is sent anywhere.
 2. **Weeks 2 to 3: find out what you own.** Use **Discover** to read every SAML, OIDC and OAuth app in your Entra
    tenant (read-only). It lands in **Inventory**, where you record owners and what each app is for.
 3. **Every week after that: keep it healthy.** Check **Overview** for expired or expiring certificates and secrets,
-   broken settings and apps with no owner. When a sign-in fails, use **Flow tracer** and **Playbooks**.
+   broken settings and apps with no owner. When a sign-in fails, use **Flow tracer** and **Playbooks**. The
+   **Flow tracer training** on the Learn page teaches that in seven short exercises before the first real one.
 
 ## What's inside
 
@@ -50,7 +51,11 @@ It runs in your browser. Nothing you paste into it is sent anywhere.
 | --- | --- |
 | MFA and SSO coverage | How many people have a phishing-resistant sign-in method (passkey, Windows Hello, macOS Platform SSO), which admins don't, a three-wave rollout plan with a download of who is left in each wave, the authentication methods policy, and SSO coverage: which enterprise apps use SAML or OIDC, require assignment and remove leavers with SCIM. Works on Entra ID Free (it counts methods per user instead of using Microsoft's P1 report). Read with `posture/Export-F360Posture.ps1` or by signing in. |
 | OAuth grants | Every permission your apps hold, rated Critical, High, Medium or Low by what it lets the app do on its own. Finds apps that could take over the tenant, apps that read everyone's mail or files with no user signed in, third-party apps users approved without IT (shadow IT), powerful apps with no owner, and grants the app no longer asks for. Links to the Entra and Azure portal pages that change each one, and exports a CSV. Uses the permissions Discover already reads; no extra access. |
-| Detections | Seven identity detection rules written as tested code: MFA fatigue, password spray, password guessing followed by a sign-in, legacy authentication, a session token used from two countries, new sign-in method right after a sign-in from a new country, and app consent right after a suspicious sign-in. Each has its MITRE ATT&CK technique, false positives, a response playbook and the same logic in KQL for Microsoft Sentinel. Reads sign-in and audit logs you load (the admin center's Download JSON works on Entra ID Free; `detections/Export-F360SignIns.ps1` reads them through Graph on P1). |
+| Detections | Nine identity detection rules written as tested code: MFA fatigue, password spray, password guessing followed by a sign-in, legacy authentication, a session token used from two countries, new sign-in method right after a sign-in from a new country, a risky sign-in that succeeded (Entra ID Protection rated it medium or high), a sensitive change (role, MFA method, credentials, password) right after a risky sign-in, and app consent right after a suspicious sign-in. Each has its MITRE ATT&CK technique, false positives, a response playbook and the same logic in KQL for Microsoft Sentinel. Reads sign-in and audit logs you load (the admin center's Download JSON works on Entra ID Free; `detections/Export-F360SignIns.ps1` reads them through Graph on P1), an Entity 360 timeline CSV, or reads them straight from the tenant with **Read from your tenant** (P1 or higher; risk levels need P2). |
+| How access ends | For every enterprise app: access, ID and SAML token life (Entra default or a token lifetime policy), Conditional Access sign-in frequency, persistent browser and continuous access evaluation (P1), and the health of its SCIM provisioning job (schedule, last cycle, quarantine). Adds a **declared app profile** on each Inventory entry for what only the vendor knows: the app's own session length, idle timeout and whether it ends sessions on a SCIM disable. Read with `access/Export-F360Access.ps1` or by signing in (adds the read-only Synchronization.Read.All permission). |
+| Activity | Loads all four Entra sign-in log tabs (interactive, non-interactive silent refreshes, service principal, managed identity), audit logs, provisioning logs and Entity 360's timeline CSV, and keeps a small per-person, per-app summary in this browser: last sign-in, last silent refresh, protocol, devices that used device SSO, SCIM results, and account events such as disabled and sessions revoked. Measures **refresh cadence**: how often each app really goes back to Entra. Free tenants use the admin center's Download JSON; `activity/Export-F360Activity.ps1` and sign-in read through Graph on P1. With the Federation 360 Capture extension, **Live refresh capture** lists the token refreshes this browser makes, per app, with the gap between them and the token lifetime that came back. |
+| Investigate | One incident, every source, one timeline. Load sign-in and audit logs (files, **Read from your tenant**, or **Investigate this person** on a Detections hit), Detections exports, Entity 360 timeline CSVs, and Exchange evidence (`Get-InboxRule` and `Get-MessageTraceV2` as JSON); anything else is kept and hashed. Every step is tagged with its MITRE ATT&CK technique and grouped by tactic; a likely phishing lure, forwarding or hiding inbox rules, role and credential changes are flagged. Scope (addresses that got in, apps reached), a suggested severity with its reason, a verdict, findings, and a NIST SP 800-61 checklist with timed ticks. **Contain and clean up**: Remediation 360 hand-offs (disable everywhere, isolate a device seen in the suspicious sign-ins), the contain runbook, a clean-up runbook (MFA methods added during the incident, consent grants, inbox rules, revoke sessions again; What-if unless `-Run`), and **Verify containment** (account disabled, sessions revoked after containment, no successful sign-in since). **Download evidence pack**: the case as JSON with a SHA-256 chain of custody for every file, plus a one-page HTML incident report for leadership. |
+| User lookup | One person, every app they can reach: assigned directly or through nested groups, consented, or simply signed in to. For each app it shows the last sign-in and silent refresh, whether tokens are likely still live, the last SCIM result, and the **offboarding exposure window**: how long they could still get in if you disabled them now, longest first. Apps whose own session length isn't declared show as unknown, so you know where to look. Flags sign-ins to Microsoft tools often used in device code phishing (Azure CLI, Graph Command Line Tools and others). `lookup/Export-F360UserAccess.ps1` or a read-only browser sign-in (Directory.Read.All, AuditLog.Read.All). **Contain**: **Disable user everywhere in Remediation 360**, **Remove from this app in Remediation 360** and **Isolate in Remediation 360** open Remediation 360 with the request filled in (Remediation 360 does the writes, as you, and audits them); **Download contain runbook** gives the same steps as PowerShell that only shows what it would do until you add `-Run`; **Verify with a fresh read** compares the read before and after; a lab offboarding drill records the measured times. |
 
 **Troubleshoot**
 
@@ -69,7 +74,7 @@ It runs in your browser. Nothing you paste into it is sent anywhere.
 
 | Page | What it does |
 | --- | --- |
-| Learn | How to create, maintain and remove each kind of integration, sequence diagrams of every flow, a glossary and a troubleshooting method. Includes **Device SSO**: how macOS Platform SSO and the Windows Primary Refresh Token (PRT) sign a user in to the device, and how that carries on into browser SSO for SAML and OIDC apps, with what to check when the user is prompted anyway. Read-only reading, no tenant access. |
+| Learn | How to create, maintain and remove each kind of integration, sequence diagrams of every flow, a glossary and a troubleshooting method. Includes **Device SSO**: how macOS Platform SSO and the Windows Primary Refresh Token (PRT) sign a user in to the device, and how that carries on into browser SSO for SAML and OIDC apps, with what to check when the user is prompted anyway. Also the **Flow tracer training**: seven hands-on exercises that take a new admin from reading an example sign-in to capturing one, breaking one in the lab, diagnosing it and sharing a redacted copy. Read-only reading, no tenant access. |
 | Build your lab | Click-by-click steps and a kit (`lab/`) to build your own free Entra practice tenant with Terraform. |
 
 ## Where each part stands
@@ -79,8 +84,8 @@ Honest status, so you know what has been proven and what hasn't.
 | Status | Parts |
 | --- | --- |
 | **Run against a real free Entra test tenant** | Build your lab, Discover, Live test (SAML, OpenID Connect and client credentials), SCIM lab. |
-| **Built and unit-tested, not yet run for real** | Federation 360 Capture extension (tested end to end in Chromium against a stand-in sign-in server; not yet loaded in Edge). Flow tracer's Entra's verdict and `signin-logs/Connect-F360SignInLogs.ps1` (tested with Microsoft Graph mocked; needs an Entra ID P1 tenant to run for real). Connectivity test script (not yet published through Intune to managed devices). |
-| **Tried on the built-in sample data only** | OAuth grants, MFA and SSO coverage, Detections. Their PowerShell scripts, `posture/Export-F360Posture.ps1` and `detections/Export-F360SignIns.ps1`, have not been run yet. |
+| **Built and unit-tested, not yet run for real** | Federation 360 Capture extension (tested end to end in Chromium against a stand-in sign-in server; it loads and connects in Edge and Chrome, but a capture of a real Entra sign-in has not been confirmed yet). Flow tracer's Entra's verdict and `signin-logs/Connect-F360SignInLogs.ps1` (tested with Microsoft Graph mocked; needs an Entra ID P1 tenant to run for real). Connectivity test script (not yet published through Intune to managed devices). |
+| **Tried on the built-in sample data only** | OAuth grants, MFA and SSO coverage, Detections (including Read from your tenant), Investigate, How access ends, Activity, User lookup. Their PowerShell scripts, `posture/Export-F360Posture.ps1`, `detections/Export-F360SignIns.ps1`, `access/Export-F360Access.ps1`, `activity/Export-F360Activity.ps1` and `lookup/Export-F360UserAccess.ps1`, have not been run yet. |
 | **Reference content** | Start here, Learn (including Device SSO), Setup wizards, Playbooks, and the SAML, JWT, SCIM and metadata decoders, which work on anything you paste. |
 | **Not built yet** | Identity settings kept as Terraform with drift checks, a SCIM joiner/mover/leaver test run, and access review sheets. |
 
@@ -129,10 +134,11 @@ npm run build    # dist/index.html, one self-contained file
 | Decoders, checkers, Flow tracer, Inventory | Nothing. Everything stays in the browser tab. | Always |
 | Discover | Microsoft Graph, read-only (`Application.Read.All`, `Directory.Read.All`, delegated) | Only after you sign in |
 | Live test | Microsoft Entra ID and the lab test app you run yourself | Only when you press a test button |
-| Detections | Nothing. Log files you load are read in that tab only. The export script talks to Microsoft Graph, read-only (`AuditLog.Read.All`). | When you load a file |
+| Detections | Nothing. Log files you load are read in that tab only. The export script and **Read from your tenant** talk to Microsoft Graph, read-only (`AuditLog.Read.All`), with your own sign-in. | When you load a file or click Read from this tenant |
+| Investigate | Nothing. Files are read and hashed in that tab only; the case is gone on reload unless you download the evidence pack. **Read from your tenant** and **Verify containment** read Microsoft Graph with your own sign-in (`AuditLog.Read.All`, `Directory.Read.All`). The contain and clean-up runbooks change the tenant only when you run them with `-Run`. | When you add a file, read the tenant or click Verify containment |
 | MFA and SSO coverage | Microsoft Graph, read-only (adds `UserAuthenticationMethod.Read.All` and `Policy.Read.All`, delegated). Keeps method types only, never phone numbers or keys. | Only after you sign in or load the script's file |
 | Connectivity test script | Only the hosts in its plan, anonymously | When it runs on a device |
-| Federation 360 Capture extension | Nothing. Hands sign-in hops only to the Federation 360 page open in the same browser. | While it's loaded |
+| Federation 360 Capture extension | Nothing. Hands sign-in hops only to Federation 360's own pages open in the same browser, when one asks. | While it's loaded |
 | Flow tracer: Entra's verdict | Microsoft Graph sign-in logs, read-only (`AuditLog.Read.All`, delegated) | Only after you set it up and sign in |
 
 Graph never returns secret values, and the export script also drops certificate bodies and secret hints.
@@ -174,13 +180,26 @@ The same `extension` folder works in both browsers:
 | 4. Private windows | **Details** > **Allow in InPrivate** | **Details** > **Allow in Incognito** |
 
 Open Flow tracer (or click the extension's toolbar button): a green **Capturing** label shows it's connected. Sign in to
-any app in another tab and the flow appears within a second; the newest sign-in opens by itself.
+any app in another tab and the flow appears within a second; the newest sign-in opens by itself. Each sign-in is
+listed with its time, its kind, the app it was for and, if it was stopped, the error code. An attempt the identity
+provider refuses is a sign-in of its own, so the next attempt in the same tab doesn't run into it.
+
+**New to this?** Click **New here? Take the training** on the Flow tracer page, or open
+`http://localhost:5173/#learn/flow-training`. Seven exercises, each with where to click and what success looks like.
+Exercises 1, 2, 3 and 7 need only a browser, 4 and 5 use the lab, and 6 needs a tenant with Entra ID P1 or higher.
 
 What it keeps: SAML messages, authorize and token calls (including the token replies a single-page app fetches in the
 background), redirects that carry a code or token, AADSTS error pages, and API calls with a token while that tab is
-signing in. Everything else is ignored, and refresh tokens are replaced with "(issued)". Hops stay in browser memory
-until the browser closes and go only to Federation 360 pages on `localhost` or the published site. Tokens an app's own
-server requests never pass through the browser, so no browser tool sees them; Entra's verdict (below) covers those.
+signing in. Everything else is ignored. From a posted form it keeps only the sign-in protocol's own fields: a typed
+password, a one-time code and the identity provider's session values are dropped before the request is even
+remembered, and `client_secret`, `code_verifier` and refresh tokens are recorded only as "(present)" or "(issued)".
+The codes and tokens a sign-in brings back are kept, because decoding them is the point, so treat a browser with the
+extension loaded like any place that holds live tokens.
+
+Hops stay in browser memory until the browser closes. They are handed only to Federation 360's own pages
+(`http://localhost:5173`, `http://localhost:8080`, the same ports on `127.0.0.1`, and the published site), and only
+when the page asks; no other page on `localhost` receives anything. Tokens an app's own server requests never pass
+through the browser, so no browser tool sees them; Entra's verdict (below) covers those.
 
 **Entra's verdict.** Beside each sign-in, Flow tracer shows the matching entry from Entra's sign-in log in plain words:
 whether Entra let the user in, the error, which Conditional Access policy blocked it and what to do. One-time setup per
@@ -278,7 +297,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\connectivity\Test-F360
 src/views/        one file per page
 src/components/   shared UI, including ActionButton and BusyNote (busy.tsx) for button feedback
 src/lib/          protocol logic (saml.ts, jwt.ts, scim.ts, x509.ts, metadata.ts, flow.ts, har.ts, health.ts, store.ts),
-                  OAuth grant ratings (grants.ts), MFA and SSO coverage (posture.ts), Entra sign-in logs (entraLogs.ts)
+                  OAuth grant ratings (grants.ts), MFA and SSO coverage (posture.ts), Entra sign-in logs (entraLogs.ts),
+                  how access ends per app (access.ts, accessCollect.ts), activity summary (activity.ts, activityCollect.ts),
+                  user lookup and exposure window (lookup.ts, lookupCollect.ts), contain hand-offs, runbook and verify (contain.ts)
 src/lib/discovery browser sign-in (entraLive.ts) and inventory merge (merge.ts)
 src/detections/   detection rules with KQL and ATT&CK (rules.ts), log normaliser (events.ts), sample log (sample.ts)
 src/data/         content (wizards, playbooks, learn, device SSO, lab steps, samples, example inventory)
@@ -286,6 +307,9 @@ src/360/          shared look and app switcher for the 360 family of tools
 extension/        Federation 360 Capture browser extension (Edge and Chrome)
 signin-logs/      one-time setup for Entra's verdict in Flow tracer
 posture/          MFA and SSO coverage export script
+access/           How access ends export script
+activity/         Activity export script
+lookup/           User lookup export script
 detections/       sign-in and audit log export script
 lab/              practice tenant kit, SCIM lab app, Live test app
 connectivity/     agentless connectivity test script

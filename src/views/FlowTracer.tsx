@@ -5,15 +5,29 @@ import { FlowView } from "../components/FlowView";
 import { EntraVerdict } from "../components/EntraVerdict";
 import { parseHar } from "../lib/har";
 import { CAPTURE_FORMAT, KIND_LABEL, type FlowCapture } from "../lib/flow";
-import { flowToCapture, useBrowserCaptures } from "../lib/browserCapture";
+import { extensionOutOfDate, flowToCapture, MIN_EXTENSION, useBrowserCaptures } from "../lib/browserCapture";
 import { HAR_SAMPLES } from "../data/harSamples";
+import { Section, openSection } from "../components/Section";
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
+/**
+ * The recording or example that is open. It stays open while you read a playbook and come back, so the finding and the
+ * fix can be compared. Held in this tab's memory only: gone when the tab is reloaded or closed.
+ */
+let lastLoaded: FlowCapture | null = null;
+
+/** The result's summary opens when you ask for a result, and the page moves to it. */
+const showResult = () => openSection("flow-summary", true);
+
 export default function FlowTracer() {
-  const { toast } = useApp();
+  const { toast, go } = useApp();
   const live = useBrowserCaptures();
-  const [capture, setCapture] = useState<FlowCapture | null>(null);
+  const [capture, setCaptureState] = useState<FlowCapture | null>(lastLoaded);
+  const setCapture = (c: FlowCapture | null) => {
+    lastLoaded = c;
+    setCaptureState(c);
+  };
   const [error, setError] = useState<string | null>(null);
   const [over, setOver] = useState(false);
   /** Which recorded sign-in is open. "latest" follows each new sign-in as it happens. */
@@ -29,6 +43,7 @@ export default function FlowTracer() {
       // A redacted copy saved from this page or from Live test opens as-is.
       if (j?.format === CAPTURE_FORMAT) {
         setCapture(j as FlowCapture);
+        showResult();
         return;
       }
     } catch {
@@ -38,6 +53,7 @@ export default function FlowTracer() {
       const c = parseHar(text, name);
       setCapture(c);
       if (!c.steps.length) toast("No sign-in traffic found in this recording");
+      showResult();
     } catch (e: any) {
       setCapture(null);
       setError(e.message);
@@ -73,9 +89,11 @@ export default function FlowTracer() {
   };
 
   const openLive = (id: string | "latest") => {
+    toast(id === "latest" ? "Following new sign-ins: the newest one opens by itself" : "Opening that sign-in below");
     setCapture(null);
     setError(null);
     setPick(id);
+    showResult();
   };
 
   return (
@@ -85,13 +103,28 @@ export default function FlowTracer() {
           <h1>Flow tracer</h1>
           <p>Every hop between the app, your browser and the identity provider, with each SAML message and token decoded and anything wrong flagged. With the Federation 360 Capture extension, sign-ins appear here by themselves as they happen.</p>
         </div>
+        <button className="btn" onClick={() => go("learn", { section: "flow-training" })}>New here? Take the training</button>
       </div>
 
+      {live.connected && extensionOutOfDate(live.version) && (
+        <div className="callout warn" role="alert">
+          <strong>Reload the capture extension.</strong> This browser is running Federation 360 Capture {live.version}, and this page expects {MIN_EXTENSION} or later.
+          Open <span className="mono">edge://extensions</span> or <span className="mono">chrome://extensions</span>, click <strong>Reload</strong> on the Federation 360 Capture card (in Chrome it is the circular arrow), then reload this page.
+          The current version keeps only the sign-in's own fields from a posted form, never a typed password, hands sign-ins only to Federation 360's own pages, and lists every sign-in attempt on its own. Reloading also empties what the older version was holding.
+        </div>
+      )}
+
       {live.connected ? (
-        <section className="panel stack" aria-label="Sign-ins in this browser">
+        <Section className="panel stack" aria-label="Sign-ins in this browser">
+          <div className="spread">
+            <h2>Sign-ins in this browser</h2>
+            <span className="row">
+              <span className="chip" style={{ color: "var(--ok)" }}>● Capturing</span>
+              <span className="small muted" role="status">{liveCaptures.length === 0 ? "No sign-ins yet" : `${liveCaptures.length} sign-in${liveCaptures.length === 1 ? "" : "s"}`}</span>
+            </span>
+          </div>
           <div className="spread">
             <div className="row">
-              <span className="chip" style={{ color: "var(--ok)" }}>● Capturing</span>
               <span className="small muted">Federation 360 Capture {live.version} is recording sign-ins in this browser, including the tokens apps fetch in the background. Sign in to any app in another tab or window and it appears here.</span>
             </div>
             <div className="row">
@@ -99,16 +132,16 @@ export default function FlowTracer() {
               <button className="btn sm danger" onClick={() => { const n = live.flows.length; live.clear(); toast(`Cleared ${n} sign-in${n === 1 ? "" : "s"} from the list`); }} disabled={!live.flows.length}>Clear list</button>
             </div>
           </div>
-          {live.version && live.version < "0.2.0" && (
-            <div className="callout warn">This extension is version {live.version}. To also capture tokens apps fetch in the background, open <span className="mono">edge://extensions</span> or <span className="mono">chrome://extensions</span> and click the reload arrow on Federation 360 Capture.</div>
-          )}
           {liveCaptures.length ? (
             <div className="row" role="list">
               {liveCaptures.map((c, i) => {
                 const on = !capture && (pick === c.id || (pick === "latest" && i === 0));
+                // Which app it was for, when the sign-in says, and the error that stopped it, so attempts can be told apart.
+                const app = c.title.startsWith("Sign-in on ") ? c.title.slice("Sign-in on ".length) : "";
+                const stopped = c.steps.find((s) => s.error)?.error?.code;
                 return (
                   <button key={c.id} role="listitem" className={`btn sm${on ? " on" : ""}`} onClick={() => openLive(c.id)} title={`${c.steps.length} hops`}>
-                    {time(c.startedAt)} · {KIND_LABEL[c.kind]} · {c.title.replace(/^Sign-in on /, "")}
+                    {time(c.startedAt)} · {KIND_LABEL[c.kind]}{app && ` · ${app}`}{stopped && ` · error ${stopped}`}
                   </button>
                 );
               })}
@@ -119,9 +152,10 @@ export default function FlowTracer() {
           <p className="small muted" style={{ margin: 0 }}>
             Tokens an app's own server asks for (a web app with a client secret or certificate) never pass through this browser, so no browser tool can show them. Entra's verdict, under each sign-in, still covers those.
           </p>
-        </section>
+        </Section>
       ) : (
-        <section className="panel stack" aria-label="Automatic capture">
+        <Section className="panel stack" aria-label="Automatic capture">
+          <h2>Turn on automatic capture</h2>
           <div className="callout">
             <strong>Turn on automatic capture (one time).</strong> Load the Federation 360 Capture extension in Edge or Chrome and every sign-in appears on this page as it happens, decoded, with nothing to save or upload.
           </div>
@@ -135,13 +169,14 @@ export default function FlowTracer() {
               <li>Reload this page. A green <strong>Capturing</strong> label replaces this box.</li>
             </ol>
             <p className="small muted" style={{ margin: "8px 0 0" }}>
-              The extension keeps only sign-in hops (SAML messages, authorize and token calls, redirects that carry a code or token, AADSTS error pages), holds them in browser memory until the browser closes, and passes them only to this page. It sends nothing anywhere else.
+              The extension keeps only sign-in hops (SAML messages, authorize and token calls, redirects that carry a code or token, AADSTS error pages). From a posted form it keeps only the sign-in's own fields, never a typed password. It holds the hops in browser memory until the browser closes, hands them only to Federation 360's own pages when one asks, and sends nothing over the network.
             </p>
           </details>
-        </section>
+        </Section>
       )}
 
-      <section className="panel stack">
+      <Section className="panel stack">
+        <h2>Load a recording</h2>
         <div className="spread">
           <span className="eyebrow">Or load a recording</span>
           <div className="row">
@@ -173,7 +208,7 @@ export default function FlowTracer() {
             A recording holds live session cookies and tokens. Treat it like a password: don't email it or attach it to tickets. To share what you found, use <strong>Download redacted copy</strong> below; it keeps only the sign-in hops and removes codes, token signatures and SAML signature values.
           </p>
         </details>
-      </section>
+      </Section>
 
       {error && <div className="callout warn">{error}</div>}
       {shown && <EntraVerdict key={shown.id} capture={shown} />}

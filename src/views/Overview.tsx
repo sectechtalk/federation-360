@@ -5,6 +5,7 @@ import { grantRows, grantSummary } from "../lib/grants";
 import { PROTOCOLS } from "../lib/protocols";
 import { usePref } from "../lib/store";
 import { ENV_LABEL, PLATFORM_LABEL, type Severity } from "../lib/types";
+import { Section } from "../components/Section";
 
 export default function Overview() {
   const { tenants, apps, go, loading, loadExamples, toast } = useApp();
@@ -65,7 +66,7 @@ export default function Overview() {
       </div>
 
       {!welcomeHidden && (
-        <section className="panel stack" aria-label="Welcome">
+        <Section className="panel stack" aria-label="Welcome">
           <h2>New to SAML, OIDC and SCIM?</h2>
           <p style={{ maxWidth: "75ch" }}>
             Start on Getting started. It explains what they are in plain words, gives you a step-by-step path for your first weeks, and tells you which page to
@@ -75,7 +76,7 @@ export default function Overview() {
             <button className="btn primary" onClick={() => go("start")}>Open Getting started</button>
             <button className="btn" onClick={() => { setWelcomeHidden(true); toast("Welcome box hidden. Getting started is still in the left menu."); }}>Hide this</button>
           </div>
-        </section>
+        </Section>
       )}
 
       {!loading && apps.length === 0 && (
@@ -95,7 +96,7 @@ export default function Overview() {
 
       {apps.length > 0 && (
         <>
-          <section className="panel stack">
+          <Section className="panel stack">
             <div className="panel-head">
               <h2>What to do today</h2>
               <span className="sub">Most urgent first</span>
@@ -112,7 +113,7 @@ export default function Overview() {
                 ))}
               </div>
             )}
-          </section>
+          </Section>
 
           <div className="statline">
             <div><span className="n">{tenants.length}</span><span className="l">Tenants (directories)</span></div>
@@ -121,7 +122,7 @@ export default function Overview() {
             <div><span className="n" style={{ color: soon.length ? "var(--warn)" : undefined }}>{soon.length}</span><span className="l">Expiring within 30 days</span></div>
           </div>
 
-          <details className="panel" open={!welcomeHidden}>
+          <details className="panel">
             <summary><strong>What do these words mean?</strong></summary>
             <dl className="kv glance">
               <dt>Tenant</dt><dd>Your company's directory: the one place that knows every user and lets them sign in, usually Microsoft Entra ID. Big companies often have a production tenant and one or more test tenants.</dd>
@@ -133,7 +134,7 @@ export default function Overview() {
           </details>
 
           <div className="grid-2">
-            <section className="panel">
+            <Section className="panel">
               <div className="panel-head">
                 <h2>Needs attention</h2>
                 <span className="sub">{attention.length} app{attention.length === 1 ? "" : "s"}</span>
@@ -162,9 +163,9 @@ export default function Overview() {
                   ))}
                 </div>
               )}
-            </section>
+            </Section>
 
-            <section className="panel">
+            <Section className="panel">
               <div className="panel-head">
                 <h2>Upcoming expirations</h2>
                 <span className="sub">Next 180 days</span>
@@ -189,10 +190,10 @@ export default function Overview() {
                   </table>
                 </div>
               )}
-            </section>
+            </Section>
           </div>
 
-          <section className="panel">
+          <Section className="panel">
             <div className="panel-head">
               <h2>Apps per tenant</h2>
               <span className="sub">How many of each kind every directory has</span>
@@ -222,7 +223,7 @@ export default function Overview() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </Section>
         </>
       )}
 

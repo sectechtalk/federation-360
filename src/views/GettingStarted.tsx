@@ -1,6 +1,7 @@
 import { useApp, ProtoChip } from "../components/ui";
 import { usePref } from "../lib/store";
 import { ASK_YOUR_TEAM, BASICS, PHASES, SITUATIONS, START_STEPS } from "../data/gettingStarted";
+import { Section } from "../components/Section";
 
 export default function GettingStarted() {
   const { go, toast } = useApp();
@@ -32,7 +33,7 @@ export default function GettingStarted() {
         wizards), and a free practice tenant (Build your lab). It never changes anything in your company's tenant; it only reads.
       </div>
 
-      <section className="stack">
+      <Section className="stack">
         <h2>The three things you now own, in plain words</h2>
         <p className="muted" style={{ maxWidth: "75ch" }}>
           All three exist so people use one work account everywhere, instead of a different username and password for every app. Your company's directory
@@ -40,19 +41,19 @@ export default function GettingStarted() {
         </p>
         <div className="grid-3">
           {BASICS.map((b) => (
-            <section key={b.id} className="panel stack">
+            <Section key={b.id} className="panel stack">
               <div className="spread"><h3>{b.name}</h3><ProtoChip p={b.id} /></div>
               <strong className="small">{b.short}</strong>
               <p className="small">{b.oneLine}</p>
               <p className="small muted"><strong>Think of it as:</strong> {b.analogy}</p>
               <p className="small muted">{b.atWork}</p>
-            </section>
+            </Section>
           ))}
         </div>
         <div><button className="btn" onClick={() => go("learn")}>Go deeper on Learn</button></div>
-      </section>
+      </Section>
 
-      <section className="stack" id="path">
+      <Section className="stack" id="path">
         <div className="spread">
           <h2>Your path: first, next, ongoing</h2>
           <span className="small muted" aria-live="polite">{doneCount} of {START_STEPS.length} done{doneCount === START_STEPS.length ? ". You're up and running." : ""}</span>
@@ -85,9 +86,9 @@ export default function GettingStarted() {
           </div>
         ))}
         {doneCount > 0 && <div><button className="btn sm" onClick={() => { setDone([]); toast("Ticks cleared"); }}>Clear my ticks</button></div>}
-      </section>
+      </Section>
 
-      <section className="stack">
+      <Section className="stack">
         <h2>Someone just asked me to…</h2>
         <p className="muted" style={{ maxWidth: "75ch" }}>The requests a new owner gets most, and the one page that answers each.</p>
         <div className="grid-2">
@@ -99,13 +100,13 @@ export default function GettingStarted() {
             </div>
           ))}
         </div>
-      </section>
+      </Section>
 
-      <section className="panel stack">
+      <Section className="panel stack">
         <h2>Questions to ask your team in your first week</h2>
         <p className="small muted">Your manager or whoever owned this before you can answer these. Write the answers in Inventory, under each tenant's Notes.</p>
         <ul className="plain">{ASK_YOUR_TEAM.map((q) => <li key={q}>{q}</li>)}</ul>
-      </section>
+      </Section>
 
       <div className="callout warn">
         <strong>One rule above all:</strong> practise in your lab tenant, never in your company's live tenant. A mistake on a live SAML or OIDC app can stop

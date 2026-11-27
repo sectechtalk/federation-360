@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTenantClient } from "../components/tenantSignIn";
 import { CodeBlock, Field, FindingList, Seg, Sev, useApp } from "../components/ui";
 import { ActionButton, BusyNote, downloadFile } from "../components/busy";
 import { usePref } from "../lib/store";
@@ -10,6 +11,7 @@ import { collectPosture, graphGetter, POSTURE_SCOPES, USER_LIMIT } from "../lib/
 import { browserSignInBlocker, currentRedirectUri, redeemCode, startSignIn, takeRedirectResult } from "../lib/discovery/entraLive";
 import { samplePosture } from "../data/samplePosture";
 import postureScript from "../../posture/Export-F360Posture.ps1?raw";
+import { Section } from "../components/Section";
 
 const SCRIPT_NAME = "Export-F360Posture.ps1";
 const GUID = /^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
@@ -18,8 +20,7 @@ const LEVEL_SEV: Record<MfaLevel, "ok" | "warn" | "critical"> = { "phishing-resi
 export default function Posture() {
   const { tenants, apps, go, toast } = useApp();
   const entraTenants = tenants.filter((t) => t.platform === "entra" && GUID.test(t.tenantRef) && !t.example);
-  const [tenantId, setTenantId] = usePref("discover:tenantId", entraTenants[0]?.tenantRef ?? "");
-  const [clientId, setClientId] = usePref("discover:clientId", "");
+  const [tenantId, setTenantId, clientId, setClientId] = useTenantClient(entraTenants[0]?.tenantRef ?? "");
   const [snap, setSnap] = usePref<PostureSnapshot | null>("posture:snapshot", null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +107,7 @@ export default function Posture() {
       {error && <div className="callout crit">{error}</div>}
 
       {!snap && (
-        <section className="panel stack">
+        <Section className="panel stack">
           <h2>Read your tenant</h2>
           <p className="small" style={{ maxWidth: "80ch" }}>
             Federation 360 reads the authentication methods policy, security defaults, admin roles, the <em>types</em> of sign-in method each user has
@@ -141,12 +142,12 @@ export default function Posture() {
             <span className="small muted">Just looking?</span>
             <ActionButton busy="Loading the sample…" onClick={loadSample}>Load the sample tenant</ActionButton>
           </div>
-        </section>
+        </Section>
       )}
 
       {snap && mfa && sso && (
         <>
-          <section className="panel">
+          <Section className="panel">
             <div className="spread">
               <div>
                 <div className="eyebrow">Scan · {new Date(snap.collectedAt).toLocaleString()} · {snap.collector === "sample" ? "made-up sample" : snap.collector === "powershell" ? "from PowerShell" : "from this page"}</div>
@@ -159,7 +160,7 @@ export default function Posture() {
               </span>
             </div>
             {snap.warnings.map((w) => <div key={w} className="callout warn" style={{ marginTop: 8 }}>{w}</div>)}
-          </section>
+          </Section>
 
           <div className="statline">
             <div><span className="n" style={{ color: mfa.percent["phishing-resistant"] >= 90 ? "var(--ok)" : "var(--warn)" }}>{mfa.percent["phishing-resistant"]}%</span><span className="l">People with a phishing-resistant method ({mfa.counts["phishing-resistant"]} of {mfa.members.length})</span></div>
@@ -179,13 +180,13 @@ export default function Posture() {
           </p>
 
           {mfa.findings.length > 0 && (
-            <section className="panel stack">
+            <Section className="panel stack">
               <div className="panel-head"><h2>What needs you</h2><span className="sub">Most urgent first</span></div>
               <FindingList findings={mfa.findings} />
-            </section>
+            </Section>
           )}
 
-          <section className="panel stack">
+          <Section className="panel stack">
             <div className="panel-head">
               <h2>Rollout plan: phishing-resistant MFA in three waves</h2>
               <span className="sub">Staged, with a way back at every step</span>
@@ -228,9 +229,9 @@ export default function Posture() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </Section>
 
-          <section className="panel stack">
+          <Section className="panel stack">
             <div className="spread">
               <h2>People</h2>
               <div className="row">
@@ -275,9 +276,9 @@ export default function Posture() {
               </table>
             </div>
             {shownUsers.length === 0 && <p className="muted">Nobody matches.</p>}
-          </section>
+          </Section>
 
-          <section className="panel stack">
+          <Section className="panel stack">
             <div className="panel-head"><h2>Authentication methods policy</h2><span className="sub">Which methods are on, and for whom</span></div>
             {snap.methodsPolicy ? (
               <div className="table-wrap">
@@ -298,9 +299,9 @@ export default function Posture() {
               <p className="muted">Not read in this scan (needs Policy.Read.All).</p>
             )}
             <div><a className="btn sm" href={PORTAL.methodsPolicy} target="_blank" rel="noreferrer">Entra: authentication methods policies ↗</a></div>
-          </section>
+          </Section>
 
-          <section className="panel stack">
+          <Section className="panel stack">
             <div className="panel-head"><h2>SSO coverage</h2><span className="sub">{sso.total} enterprise app{sso.total === 1 ? "" : "s"} you added (Microsoft's own apps left out)</span></div>
             <div className="statline">
               <div><span className="n">{sso.percent.sso}%</span><span className="l">Use SAML or OIDC single sign-on ({sso.sso} of {sso.total})</span></div>
@@ -337,7 +338,7 @@ export default function Posture() {
               </table>
             </div>
             <p className="small muted">SCIM comes from Inventory. Run Discover so apps here match their Inventory entries by app ID.</p>
-          </section>
+          </Section>
         </>
       )}
     </div>

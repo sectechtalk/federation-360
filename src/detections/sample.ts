@@ -20,6 +20,8 @@ export function sampleSignInLog(now = new Date()) {
     location: { city, countryOrRegion: country },
     status: { errorCode, failureReason: errorCode === 50126 ? "Invalid username or password." : errorCode === 500121 ? "Authentication failed during strong authentication request." : null, additionalDetails: null as string | null },
     sessionId: `sess-${user}-1`,
+    riskLevelDuringSignIn: "none",
+    deviceDetail: { displayName: errorCode === 0 && country === "US" ? `${user.split(".")[0].toUpperCase()}-PC` : "" },
     ...more,
   });
   const office = ["192.0.2.10", "US", "Seattle"] as const;
@@ -52,7 +54,11 @@ export function sampleSignInLog(now = new Date()) {
   signIns.push(si(760, "frankie.mac", "198.51.100.200", "SG", "Singapore", 0, { sessionId: "sess-frankie-9", isInteractive: false, appDisplayName: "Microsoft Graph" }));
 
   // 6. New country then new security info: Casey from the office earlier, then from Nigeria, then a new phone.
-  signIns.push(si(800, "casey.helpdesk", "198.51.100.140", "NG", "Lagos", 0, { sessionId: "sess-casey-2" }));
+  signIns.push(si(800, "casey.helpdesk", "198.51.100.140", "NG", "Lagos", 0, { sessionId: "sess-casey-2", riskLevelDuringSignIn: "medium" }));
+
+  // 8. Risky sign-in, then a sensitive change: Entra ID Protection rates Gray's sign-in high (anonymous IP address),
+  //    and 25 minutes later Gray's account adds Harper to the Global Administrator role.
+  signIns.push(si(900, "gray.finance", "203.0.113.120", "DE", "Frankfurt", 0, { sessionId: "sess-gray-2", riskLevelDuringSignIn: "high", appDisplayName: "Microsoft Entra admin center" }));
 
   const audit = (m: number, activity: string, actor: string, target: { userPrincipalName?: string; displayName?: string; type: string }) => ({
     id: `audit-${++n}`,
@@ -67,6 +73,7 @@ export function sampleSignInLog(now = new Date()) {
     audit(820, "User registered security info", "casey.helpdesk", { userPrincipalName: `casey.helpdesk@${D}`, type: "User" }),
     // 7. Blair consents to a mail-reading app 40 minutes after the MFA fatigue attack.
     audit(350, "Consent to application", "blair.ops", { displayName: "Northwind Meeting Notes", type: "ServicePrincipal" }),
+    audit(925, "Add member to role", "gray.finance", { userPrincipalName: `harper.sales@${D}`, displayName: "Global Administrator", type: "User" }),
     // Ordinary: a new starter registers security info with no new-country sign-in before it.
     audit(100, "User registered security info", "quinn.design", { userPrincipalName: `quinn.design@${D}`, type: "User" }),
   ];

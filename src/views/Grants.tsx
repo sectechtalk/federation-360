@@ -5,6 +5,7 @@ import {
   CONSENT_SETTINGS_URL, grantPortalLinks, grantRows, grantsCsv, grantSummary, RISK_LABEL, RISK_ORDER, RISK_SEVERITY,
   type GrantRisk, type GrantRow,
 } from "../lib/grants";
+import { Section } from "../components/Section";
 
 type RiskFilter = "risky" | "all" | GrantRisk;
 
@@ -89,7 +90,7 @@ export default function Grants() {
             </dl>
           </details>
 
-          <section className="panel stack">
+          <Section className="panel stack">
             <div className="panel-head">
               <h2>Stop new risky consent</h2>
               <span className="sub">Tenant setting, free on every Entra tenant</span>
@@ -104,9 +105,10 @@ export default function Grants() {
               <button className="btn sm" onClick={() => go("playbooks", { id: "oauth-user-consent" })}>Shadow IT playbook</button>
               <button className="btn sm" onClick={() => go("playbooks", { id: "oauth-risky-grant" })}>Remove a risky grant playbook</button>
             </div>
-          </section>
+          </Section>
 
-          <section className="panel stack">
+          <Section className="panel stack">
+            <h2>Every grant</h2>
             <div className="spread">
               <Seg<RiskFilter>
                 label="Risk"
@@ -169,7 +171,7 @@ export default function Grants() {
                 </table>
               </div>
             )}
-          </section>
+          </Section>
         </>
       )}
     </div>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useApp, ProtoChip } from "../components/ui";
 import { PLAYBOOKS, playbookById, type Playbook } from "../data/playbooks";
 import type { ProtocolId } from "../lib/types";
+import { Section } from "../components/Section";
 
 const TOOL_LABEL: Record<string, string> = { saml: "SAML decoder", jwt: "JWT decoder", metadata: "Metadata checker", scim: "SCIM checker", inventory: "Inventory", wizards: "Setup wizards", discover: "Discover", grants: "OAuth grants", posture: "MFA and SSO coverage", detections: "Detections", flowtracer: "Flow tracer" };
 
@@ -23,25 +24,26 @@ function Detail({ p, onBack }: { p: Playbook; onBack: () => void }) {
           <a className="btn" href={`https://login.microsoftonline.com/error?code=${p.code.replace("AADSTS", "")}`} target="_blank" rel="noreferrer">Microsoft's description ↗</a>
         )}
       </div>
-      <section className="panel stack">
+      <Section className="panel stack">
+        <h2>The problem</h2>
         <div className="eyebrow">What you see</div>
         <p>{p.symptom}</p>
         <div className="eyebrow" style={{ marginTop: 6 }}>What it means</div>
         <p style={{ maxWidth: "72ch" }}>{p.meaning}</p>
-      </section>
+      </Section>
       <div className="grid-3">
-        <section className="panel stack">
+        <Section className="panel stack">
           <h3>Likely causes</h3>
           <ul className="plain">{p.causes.map((c, i) => <li key={i}>{c}</li>)}</ul>
-        </section>
-        <section className="panel stack">
+        </Section>
+        <Section className="panel stack">
           <h3>How to confirm</h3>
           <ol className="actions">{p.checks.map((c, i) => <li key={i}>{c}</li>)}</ol>
-        </section>
-        <section className="panel stack">
+        </Section>
+        <Section className="panel stack">
           <h3>How to fix</h3>
           <ol className="actions">{p.fixes.map((c, i) => <li key={i}>{c}</li>)}</ol>
-        </section>
+        </Section>
       </div>
       {p.tools && (
         <div className="row">
@@ -102,7 +104,7 @@ export default function Playbooks() {
         </div>
       )}
       {groups.filter((g) => g.items.length).map((g) => (
-        <section key={g.label} className="stack">
+        <Section key={g.label} className="stack">
           <h2>{g.label}</h2>
           <div className="table-wrap">
             <table>
@@ -117,7 +119,7 @@ export default function Playbooks() {
               </tbody>
             </table>
           </div>
-        </section>
+        </Section>
       ))}
     </div>
   );

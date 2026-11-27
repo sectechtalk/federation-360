@@ -29,7 +29,9 @@ export function graphGetter(token: string, fetchImpl: typeof fetch = fetch): Get
       }
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
-        const e = new Error(`${r.status} ${j?.error?.code ?? ""}: ${j?.error?.message ?? r.statusText}`.trim()) as Error & { status?: number };
+        const what = url.replace("https://graph.microsoft.com/", "").split("?")[0];
+        const e = new Error(`${r.status} ${j?.error?.code ?? ""}: ${j?.error?.message ?? r.statusText} (GET ${what})`.replace(/ +/g, " ").trim()) as Error & { status?: number; path?: string };
+        e.path = what;
         e.status = r.status;
         throw e;
       }

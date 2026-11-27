@@ -259,3 +259,21 @@ a.app-switch-item:hover { background: var(--surface-2); }
 .kv.glance { margin-top: 10px; }
 .kv.glance dd { max-width: 80ch; font-family: var(--font-sans); font-size: var(--text-base); }
 .kv.glance dt { color: var(--fg); font-weight: 500; }
+
+/* Learn: SSO vs OAuth vs OIDC vs SAML animation (dark version in both themes), with a still picture for reduced motion. */
+.learn-anim { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.learn-anim img { width: 100%; max-width: 960px; height: auto; border-radius: var(--radius); border: 1px solid var(--line); }
+.learn-anim .anim-still { display: none; }
+@media (prefers-reduced-motion: reduce) { .learn-anim .anim-moving { display: none; } .learn-anim .anim-still { display: block; } }
+
+/* Collapsible sections (house rule 2026-11-27): every section folds, and every section starts collapsed.
+   The heading row stays visible; the rest folds away. Expand / Collapse is a normal filled button. */
+.fold-head { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+.fold-title { flex: 1 1 auto; min-width: 0; }
+.fold-title > .panel-head, .fold-title > h2, .fold-title > h3 { margin: 0; }
+.fold-head:hover .fold-title h2, .fold-head:hover .fold-title h3 { color: var(--accent-strong); }
+.fold-btn { flex: 0 0 auto; white-space: nowrap; }
+.fold-chev { display: inline-block; width: 1em; text-align: center; }
+.fold-body[hidden] { display: none !important; }
+section.fold:not(.stack) > .fold-body:not([hidden]) { margin-top: 12px; }
+.fold-all { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }

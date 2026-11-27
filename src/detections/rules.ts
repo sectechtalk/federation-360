@@ -14,7 +14,7 @@ export interface Hit {
   evidence: string[];
 }
 
-export type Need = "signIns" | "audits" | "sessionIds";
+export type Need = "signIns" | "audits" | "sessionIds" | "risk";
 
 export interface Rule {
   id: string;
@@ -343,6 +343,87 @@ changes
   },
 };
 
+const RISKY = new Set(["medium", "high"]);
+/** Changes an attacker makes to keep or widen access once inside an account. */
+export const SENSITIVE_CHANGE =
+  /user registered security info|admin registered security info|add member to role|add eligible member to role|add app role assignment|add delegated permission grant|add service principal credentials|update application.*certificates and secrets|add owner to (application|service principal)|reset password|change user password/i;
+// App consent is left out on purpose: "App consent right after a suspicious sign-in" already covers it, risky sign-ins included.
+
+export const riskySignIn: Rule = {
+  id: "risky-signin",
+  title: "Risky sign-in succeeded (Entra ID Protection rated it medium or high)",
+  attack: { id: "T1078.004", name: "Valid Accounts: Cloud Accounts" },
+  summary:
+    "Entra ID Protection scores every sign-in for signs of an attacker: an anonymous or malicious IP address, impossible travel, a token or session that looks stolen, a password seen in a leak. This rule surfaces the ones it rated medium or high that still succeeded, so a person decides whether it was the user. Critical when Microsoft rated it high.",
+  needs: ["signIns", "risk"],
+  falsePositives: "A user on a new VPN, a hotel or airport network, or travelling. Ask them on a channel the attacker can't see, and check the IP address and device in the evidence.",
+  playbook: "incident-account-takeover",
+  kql: `SigninLogs
+| where TimeGenerated > ago(7d)
+| where ResultType == 0 and RiskLevelDuringSignIn in ("medium", "high")
+| project TimeGenerated, UserPrincipalName, RiskLevelDuringSignIn, RiskState, RiskEventTypes_V2, IPAddress, Location, AppDisplayName
+| order by TimeGenerated desc`,
+  run({ signIns }) {
+    const hits: Hit[] = [];
+    for (const [user, evs] of byKey(signIns.filter((e) => ok(e) && RISKY.has(e.risk ?? "")), (e) => e.user)) {
+      for (const day of bursts(evs, 24 * HOUR)) {
+        const high = day.some((e) => e.risk === "high");
+        hits.push({
+          rule: this.id,
+          severity: high ? "critical" : "warn",
+          user,
+          time: day[0].time,
+          title: `${day.length} ${high ? "high" : "medium"}-risk sign-in${day.length === 1 ? "" : "s"} succeeded${day[0].country ? ` from ${[...new Set(day.map((e) => e.country).filter(Boolean))].join(", ")}` : ""}`,
+          evidence: day.slice(0, 6).map((e) => `${at(e.time)} risk ${e.risk} · ${where(e) || "no address"} · ${e.app}${e.device ? ` · device ${e.device}` : ""}`),
+        });
+      }
+    }
+    return hits;
+  },
+};
+
+export const riskyThenChange: Rule = {
+  id: "risky-then-change",
+  title: "Sensitive change right after a risky sign-in",
+  attack: { id: "T1098", name: "Account Manipulation" },
+  summary:
+    "What turns a risky sign-in into an incident is what happens next: a new MFA method, a role, a delegated permission grant, new app credentials or a password change, by or to the same person. Fires when one of those audit events follows a medium or high-risk successful sign-in within 4 hours.",
+  needs: ["signIns", "audits", "risk"],
+  falsePositives: "A user who really did set up a new phone while on a flagged network. Confirm with them before containing, but treat a role or credential change as real until shown otherwise.",
+  playbook: "incident-account-takeover",
+  kql: `let risky = SigninLogs
+| where TimeGenerated > ago(7d) and ResultType == 0 and RiskLevelDuringSignIn in ("medium", "high")
+| project RiskyTime = TimeGenerated, UserPrincipalName = tolower(UserPrincipalName), RiskLevelDuringSignIn, IPAddress;
+AuditLogs
+| where TimeGenerated > ago(7d)
+| where OperationName has_any ("security info", "member to role", "app role assignment", "delegated permission grant", "service principal credentials", "Certificates and secrets", "owner to", "password")
+| extend Actor = tolower(tostring(InitiatedBy.user.userPrincipalName)), Target = tolower(tostring(TargetResources[0].userPrincipalName))
+| extend UserPrincipalName = iff(isnotempty(Target), Target, Actor)
+| join kind=inner risky on UserPrincipalName
+| where TimeGenerated between (RiskyTime .. RiskyTime + 4h)
+| project TimeGenerated, UserPrincipalName, OperationName, RiskyTime, RiskLevelDuringSignIn, IPAddress`,
+  run({ signIns, audits }) {
+    const hits: Hit[] = [];
+    const risky = signIns.filter((e) => ok(e) && RISKY.has(e.risk ?? ""));
+    for (const a of audits.filter((x) => SENSITIVE_CHANGE.test(x.activity))) {
+      for (const user of new Set([a.actor, a.targetUser].filter(Boolean))) {
+        const prior = risky.filter((e) => e.user === user && a.time >= e.time && a.time - e.time <= 4 * HOUR).pop();
+        if (!prior) continue;
+        hits.push({
+          rule: this.id,
+          severity: "critical",
+          user,
+          time: a.time,
+          title: `${a.activity}${a.target ? ` (${a.target})` : ""} ${Math.round((a.time - prior.time) / MIN)} minutes after a ${prior.risk}-risk sign-in`,
+          evidence: [`${at(prior.time)} sign-in, risk ${prior.risk} · ${where(prior) || "no address"} · ${prior.app}`, `${at(a.time)} ${a.activity}${a.target ? `: ${a.target}` : ""}${a.actor && a.actor !== user ? ` (by ${a.actor})` : ""}`],
+        });
+        break;
+      }
+    }
+    return hits;
+  },
+};
+
 export const consentAfterSuspicious: Rule = {
   id: "consent-after-suspicious",
   title: "App consent right after a suspicious sign-in",
@@ -379,7 +460,7 @@ AuditLogs
 };
 
 /** In run order: consentAfterSuspicious reads the hits of the rules before it. */
-export const RULES: Rule[] = [mfaFatigue, passwordSpray, bruteForceSuccess, legacyAuth, tokenReplay, newCountryThenMfaChange, consentAfterSuspicious];
+export const RULES: Rule[] = [mfaFatigue, passwordSpray, bruteForceSuccess, legacyAuth, tokenReplay, newCountryThenMfaChange, riskySignIn, riskyThenChange, consentAfterSuspicious];
 
 export interface RuleResult {
   rule: Rule;
@@ -391,12 +472,15 @@ export interface RuleResult {
 export function runDetections(logs: LoadedLogs): RuleResult[] {
   const all: Hit[] = [];
   const hasSessions = logs.signIns.some((e) => e.session);
+  const hasRisk = logs.signIns.some((e) => e.risk);
   return RULES.map((rule) => {
     let missing: string | undefined;
     if (rule.needs.includes("signIns") && !logs.signIns.length) missing = "No sign-in logs loaded.";
     else if (rule.needs.includes("audits") && !logs.audits.length) missing = "Needs audit logs too (Entra audit logs, or Export-F360SignIns.ps1, which saves both).";
     else if (rule.needs.includes("sessionIds") && !hasSessions)
       missing = "These sign-ins have no session IDs. Graph v1.0 doesn't return them; use Export-F360SignIns.ps1 (Graph beta) or a Log Analytics export.";
+    else if (rule.needs.includes("risk") && !hasRisk)
+      missing = "These sign-ins have no risk level. Entra ID Protection fills it in only with Entra ID P2 (Microsoft 365 E5 and E7 include it); read them with Read from your tenant, Export-F360SignIns.ps1 or a Log Analytics export.";
     const hits = missing ? [] : rule.run.call(rule, logs, all);
     all.push(...hits);
     return { rule, hits, missing };

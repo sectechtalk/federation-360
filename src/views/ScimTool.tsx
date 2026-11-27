@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useApp, FindingList, SummaryBar, CodeBlock, Sev } from "../components/ui";
 import { checkScim, describeScim, flattenScim, KIND_LABEL, parseScim, parseScimPath, SCIM_ATTR_HELP, userIdentifiers, type ScimMessage } from "../lib/scim";
 import { SCIM_SAMPLES } from "../data/scimSamples";
+import { Section } from "../components/Section";
 
 const opText = (o: any) => {
   const op = String(o?.op ?? "").toLowerCase();
@@ -19,22 +20,23 @@ const opText = (o: any) => {
 };
 
 export default function ScimTool() {
-  const { params, apps, go } = useApp();
+  const { params, apps, go, toast } = useApp();
   const [input, setInput] = useState("");
   const [signInId, setSignInId] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [sample, setSample] = useState("");
 
-  const load = (id: string) => {
+  const load = (id: string, quiet = false) => {
     const s = SCIM_SAMPLES.find((x) => x.id === id)!;
     setInput(s.text);
     setSignInId(s.signInId ?? "");
     setNote(s.note);
     setSample(id);
+    if (!quiet) toast(`Loaded the example: ${s.label}`);
   };
 
   useEffect(() => {
-    if (!input) load("create");
+    if (!input) load("create", true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -70,7 +72,8 @@ export default function ScimTool() {
         <button className="btn" onClick={() => go("playbooks", { proto: "scim" })}>SCIM playbooks</button>
       </div>
 
-      <section className="panel stack">
+      <Section className="panel stack">
+        <h2>Check a SCIM message</h2>
         <div className="spread">
           <span className="eyebrow">Try an example</span>
           <div className="row">
@@ -93,28 +96,29 @@ export default function ScimTool() {
               : "Copy the NameID from the SAML decoder, or the preferred_username, email or sub claim from the JWT decoder."}
           </span>
         </label>
-      </section>
+      </Section>
 
       {error && <div className="callout warn">{error}</div>}
 
       {m && (
         <>
-          <section className="panel stack">
+          <Section className="panel stack">
+            <h2>What this message is</h2>
             <div className="row">
               <span className="chip proto-scim">{KIND_LABEL[m.kind]}</span>
               {m.method && <span className="tag mono">{m.method} {m.path?.split("?")[0]}</span>}
               {m.status && <Sev s={m.status >= 400 ? "critical" : "ok"} label={`HTTP ${m.status}`} />}
             </div>
             <p style={{ margin: 0, fontSize: "1.05rem" }}>{describeScim(m)}</p>
-          </section>
+          </Section>
 
-          <section className="stack">
+          <Section className="stack">
             <div className="spread"><h2>Findings</h2><SummaryBar findings={findings} /></div>
             <FindingList findings={findings} />
-          </section>
+          </Section>
 
           {record && (
-            <section className="panel stack">
+            <Section className="panel stack">
               <div className="panel-head">
                 <h2>Can this user get in?</h2>
                 <span className="sub">Two separate gates</span>
@@ -159,11 +163,11 @@ export default function ScimTool() {
                   </tbody>
                 </table>
               </div>
-            </section>
+            </Section>
           )}
 
           {ops.length > 0 && (
-            <section className="stack">
+            <Section className="stack">
               <h2>Operations</h2>
               <div className="table-wrap">
                 <table style={{ minWidth: 620 }}>
@@ -181,11 +185,11 @@ export default function ScimTool() {
                   </tbody>
                 </table>
               </div>
-            </section>
+            </Section>
           )}
 
           {rows.length > 0 && m.kind !== "patch" && (
-            <section className="stack">
+            <Section className="stack">
               <h2>Attributes</h2>
               <div className="table-wrap">
                 <table style={{ minWidth: 560 }}>
@@ -201,19 +205,19 @@ export default function ScimTool() {
                   </tbody>
                 </table>
               </div>
-            </section>
+            </Section>
           )}
 
           {m.filter && (
-            <section className="panel stack">
+            <Section className="panel stack">
               <div className="panel-head"><h2>Search filter</h2></div>
               <CodeBlock code={m.filter} />
-            </section>
+            </Section>
           )}
         </>
       )}
 
-      <section className="panel stack">
+      <Section className="panel stack">
         <div className="panel-head"><h2>Where to capture SCIM messages</h2></div>
         <ul className="plain small">
           <li><strong>Entra provisioning logs:</strong> Enterprise apps &gt; your app &gt; Provisioning &gt; Provisioning logs. Open an entry, then Troubleshooting &amp; Recommendations and Modified Properties.</li>
@@ -221,7 +225,7 @@ export default function ScimTool() {
           <li><strong>The app's side:</strong> its audit or API log, if the vendor exposes one.</li>
           <li><strong>By hand:</strong> call the app's SCIM endpoint yourself with a test token, for example GET /Users?filter=userName eq "name@example.com".</li>
         </ul>
-      </section>
+      </Section>
     </div>
   );
 }

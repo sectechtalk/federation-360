@@ -4,12 +4,15 @@ import { ActionButton, copyNow, downloadFile } from "../components/busy";
 import { appHealth, daysUntil, worst } from "../lib/health";
 import { PROTOCOLS } from "../lib/protocols";
 import {
-  emptyOidc, emptySaml, emptyScim, ENV_LABEL, newId, PLATFORM_LABEL,
-  type AppIntegration, type DiscoveryInfo, type Environment, type Platform, type Tenant,
+  emptyOidc, emptyProfile, emptySaml, emptyScim, ENV_LABEL, newId, PLATFORM_LABEL,
+  type AppIntegration, type AppProfile, type DiscoveryInfo, type Environment, type Platform, type Tenant,
 } from "../lib/types";
 import { wellKnownUrls } from "../lib/metadata";
 import { assertNoSecretMaterial, buildCredentialsExport } from "../lib/credentialExport";
 import { usePref } from "../lib/store";
+import { accessRow } from "../lib/access";
+import { AccessCard, useAccessSnapshot } from "./AccessEnds";
+import { Section } from "../components/Section";
 
 const envOpts = Object.keys(ENV_LABEL) as Environment[];
 const platOpts = Object.keys(PLATFORM_LABEL) as Platform[];
@@ -142,7 +145,18 @@ function AppEditor({ initial, onClose }: { initial: AppIntegration; onClose: () 
   const so = (k: keyof AppIntegration["oidc"], v: string) => setA({ ...a, oidc: { ...a.oidc, [k]: v } });
   const scim = a.scim ?? emptyScim();
   const sc = (k: keyof NonNullable<AppIntegration["scim"]>, v: string) => setA({ ...a, scim: { ...scim, [k]: v } });
+  const profile = a.profile ?? emptyProfile();
+  const sp = <K extends keyof AppProfile>(k: K, v: AppProfile[K]) => setA({ ...a, profile: { ...profile, [k]: v } });
+  const num = (v: string) => (v.trim() === "" || !Number.isFinite(+v) ? undefined : Math.max(0, Math.round(+v)));
+  const [accessSnap] = useAccessSnapshot();
   const isNew = !initial.name;
+  const accessApp = accessSnap?.apps.find(
+    (x) =>
+      (a.discovery?.servicePrincipalId && x.spId.toLowerCase() === a.discovery.servicePrincipalId.toLowerCase()) ||
+      (x.appId && [a.discovery?.appId, a.oidc?.clientId].some((v) => v && v.toLowerCase() === x.appId.toLowerCase())) ||
+      (!!a.example && !!accessSnap.example && x.name.toLowerCase() === a.name.toLowerCase()),
+  );
+  const access = accessSnap && accessApp ? accessRow(accessSnap, accessApp, [a]) : null;
   const save = async () => {
     if (!a.name.trim()) throw new Error("Give the integration a name");
     if (!store) throw new Error("Storage isn't connected yet. Wait a moment and try again.");
@@ -242,6 +256,33 @@ function AppEditor({ initial, onClose }: { initial: AppIntegration; onClose: () 
         )}
 
         {a.discovery && <DiscoveryPanel d={a.discovery} />}
+
+        {!isNew && (
+          <fieldset className="panel stack" style={{ margin: 0 }}>
+            <legend className="eyebrow">How access ends{access ? ` · from the scan of ${accessSnap!.collectedAt.slice(0, 10)}` : ""}</legend>
+            {access ? (
+              <AccessCard row={{ ...access, profile: a.profile }} example={accessSnap!.example} />
+            ) : (
+              <p className="small muted">
+                No access scan matches this app yet. <button className="btn sm" onClick={() => go("access")}>Open How access ends</button> and read the tenant, then run
+                Discover so the app is matched by its app ID.
+              </p>
+            )}
+          </fieldset>
+        )}
+
+        <fieldset className="panel stack" style={{ margin: 0 }}>
+          <legend className="eyebrow">Declared app profile · from the vendor's docs, not Entra</legend>
+          <p className="small muted">Entra can't see how long the app keeps people signed in. Record what the vendor documents, so User lookup can estimate how long access lasts after a disable.</p>
+          <div className="grid-2">
+            <Field id="p-sess" label="App session lasts (minutes)" type="number" value={profile.sessionMinutes?.toString() ?? ""} onChange={(v) => sp("sessionMinutes", num(v))} hint="For example 480 for 8 hours, 20160 for 14 days." />
+            <Field id="p-idle" label="Idle timeout (minutes)" type="number" value={profile.idleMinutes?.toString() ?? ""} onChange={(v) => sp("idleMinutes", num(v))} hint="Leave empty if none or unknown." />
+            <Field id="p-scim" label="Ends open sessions on SCIM disable" value={profile.endsSessionOnScimDisable} onChange={(v) => sp("endsSessionOnScimDisable", v as AppProfile["endsSessionOnScimDisable"])} options={["unknown", "yes", "no"]} />
+            <Field id="p-slo" label="Supports single logout" value={profile.singleLogout} onChange={(v) => sp("singleLogout", v as AppProfile["singleLogout"])} options={["unknown", "yes", "no"]} />
+            <Field id="p-cae" label="Honours continuous access evaluation" value={profile.cae} onChange={(v) => sp("cae", v as AppProfile["cae"])} options={["unknown", "yes", "no"]} hint="Only Microsoft's own services do today." />
+            <Field id="p-src" label="Source" value={profile.source} onChange={(v) => sp("source", v)} placeholder="Vendor doc URL" />
+          </div>
+        </fieldset>
 
         <Field id="a-notes" label="Notes" value={a.notes} onChange={(v) => set("notes", v)} multiline />
 
@@ -399,7 +440,7 @@ export default function Inventory() {
         </div>
       )}
 
-      <section className="panel">
+      <Section className="panel">
         <div className="panel-head"><h2>Tenants</h2><span className="sub">Click to edit</span></div>
         {loading ? <p className="muted">Loading…</p> : tenants.length === 0 ? (
           <div className="empty">
@@ -418,9 +459,9 @@ export default function Inventory() {
             ))}
           </div>
         )}
-      </section>
+      </Section>
 
-      <section className="stack">
+      <Section className="stack">
         <div className="spread">
           <h2>Integrations</h2>
           <div className="row">
@@ -454,7 +495,7 @@ export default function Inventory() {
             </tbody>
           </table>
         </div>
-      </section>
+      </Section>
 
       {editingApp && <AppEditor initial={editingApp} onClose={() => setEditingApp(null)} />}
       {editingTenant && <TenantEditor initial={editingTenant} onClose={() => setEditingTenant(null)} />}

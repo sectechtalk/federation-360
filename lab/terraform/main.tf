@@ -23,6 +23,10 @@ locals {
     "Directory.Read.All"                = "06da0dbc-49e2-44d2-8312-53f166ab848a"
     "UserAuthenticationMethod.Read.All" = "aec28ec7-4d02-4e8c-b864-50163aea77eb"
     "Policy.Read.All"                   = "572fea84-0151-49b2-9301-11cb16974376"
+    # How access ends: each enterprise app's provisioning (SCIM) job.
+    "Synchronization.Read.All" = "7aa02aeb-824f-4fbe-a3f7-611f751f5b55"
+    # Activity: sign-in, audit and provisioning logs (sign-in and provisioning reads need P1).
+    "AuditLog.Read.All" = "e4c9e354-4dc5-45b8-9e7c-e1393b0b1a20"
   }
 
   issuer_v1 = "https://sts.windows.net/${var.tenant_id}/"

@@ -10,6 +10,7 @@ import {
   type Match, type Problem, type TenantLogsConfig,
 } from "../lib/entraLogs";
 import setupScript from "../../signin-logs/Connect-F360SignInLogs.ps1?raw";
+import { Section } from "./Section";
 
 /** Entra writes a sign-in to its log a few minutes after it happens. Keep looking this long. */
 const WAIT_MS = 20 * 60_000;
@@ -115,7 +116,7 @@ export function EntraVerdict({ capture }: { capture: FlowCapture }) {
       {cfg && cfg.clientId !== "free" && user && (
         <span className="row small muted">
           Reading as {user}
-          <button className="btn sm" onClick={() => { signOut(cfg.tenantId); setUser(null); setState({ s: "idle" }); }}>Sign out</button>
+          <ActionButton className="btn sm" busy="Signing out…" report="toast" onClick={() => { signOut(cfg.tenantId); setUser(null); setState({ s: "idle" }); return "Signed out of the sign-in log reader"; }}>Sign out</ActionButton>
         </span>
       )}
     </div>
@@ -126,7 +127,7 @@ export function EntraVerdict({ capture }: { capture: FlowCapture }) {
     const t = tenantId ?? "<your-tenant-id>";
     const cmd = `cd ${WORKDIR}\n./signin-logs/Connect-F360SignInLogs.ps1 -TenantId ${t}`;
     return (
-      <section className="panel stack" aria-label="Entra's verdict">
+      <Section className="panel stack" aria-label="Entra's verdict">
         {head}
         <p style={{ margin: 0 }}>
           <strong>See what Entra decided about each sign-in, and why</strong>: the error, which Conditional Access policy blocked it and what to do. Set it up once for this tenant{tenantId ? <> (<span className="mono">{tenantId}</span>)</> : null}, then it appears here by itself.
@@ -144,34 +145,34 @@ export function EntraVerdict({ capture }: { capture: FlowCapture }) {
         <p className="small muted" style={{ margin: 0 }}>
           Microsoft serves sign-in logs to apps only on tenants with Entra ID P1 or higher (Microsoft 365 E3, E5 and E7 include it). On a free tenant, such as a practice lab, the script says so and changes nothing, and this box then shows where to find the sign-in in the Entra admin center instead.
         </p>
-      </section>
+      </Section>
     );
   }
 
   // ------------------------------------------------ free tenant
   if (cfg.clientId === "free" || (state.s === "problem" && state.p === "unlicensed")) {
     return (
-      <section className="panel stack" aria-label="Entra's verdict">
+      <Section className="panel stack" aria-label="Entra's verdict">
         {head}
         <div className="callout">
           <strong>This tenant's license doesn't let apps read sign-in logs.</strong> Microsoft serves them through its API only on Entra ID P1 or higher (Microsoft 365 E3, E5 and E7 include it), and this tenant is on Entra ID Free.
           {" "}To see Entra's verdict for this sign-in, open <a href={ADMIN_CENTER} target="_blank" rel="noreferrer">the Entra admin center</a> and go to <strong>Entra ID</strong> &gt; <strong>Monitoring &amp; health</strong> &gt; <strong>Sign-in logs</strong>.{requestHint}
         </div>
-      </section>
+      </Section>
     );
   }
 
   // ------------------------------------------------ signed out
   if (!user) {
     return (
-      <section className="panel stack" aria-label="Entra's verdict">
+      <Section className="panel stack" aria-label="Entra's verdict">
         {head}
         <div className="row">
           <ActionButton className="btn primary" busy="Signing in…" onClick={signIn}>Sign in to read sign-in logs</ActionButton>
           <span className="small muted">{cfg.name ? `${cfg.name}. ` : ""}A Microsoft sign-in window opens. Once you're signed in, every sign-in here gets Entra's verdict by itself for the next 24 hours.</span>
         </div>
         {state.s === "problem" && <div className="callout warn">{state.msg}</div>}
-      </section>
+      </Section>
     );
   }
 
@@ -179,7 +180,7 @@ export function EntraVerdict({ capture }: { capture: FlowCapture }) {
   if (state.s === "problem") {
     const consentUrl = `https://login.microsoftonline.com/${cfg.tenantId}/adminconsent?client_id=${cfg.clientId}`;
     return (
-      <section className="panel stack" aria-label="Entra's verdict">
+      <Section className="panel stack" aria-label="Entra's verdict">
         {head}
         {state.p === "no-consent" ? (
           <div className="callout warn">
@@ -194,16 +195,16 @@ export function EntraVerdict({ capture }: { capture: FlowCapture }) {
         )}
         <div className="row">
           <ActionButton className="btn primary" busy="Signing in…" onClick={async () => { signOut(cfg.tenantId); await signIn(); }}>Sign in again</ActionButton>
-          <button className="btn" onClick={() => setRun((n) => n + 1)}>Try again</button>
+          <ActionButton busy="Trying again…" quietOk onClick={() => { setRun((n) => n + 1); }}>Try again</ActionButton>
         </div>
-      </section>
+      </Section>
     );
   }
 
   // ------------------------------------------------ looking
   if (state.s === "idle" || state.s === "checking" || state.s === "waiting" || state.s === "gone") {
     return (
-      <section className="panel stack" aria-label="Entra's verdict">
+      <Section className="panel stack" aria-label="Entra's verdict">
         {head}
         {state.s === "waiting" ? (
           <p className="small" style={{ margin: 0 }}>
@@ -212,12 +213,12 @@ export function EntraVerdict({ capture }: { capture: FlowCapture }) {
         ) : state.s === "gone" ? (
           <p className="small" style={{ margin: 0 }}>
             No matching entry in this tenant's sign-in log. The sign-in may belong to another tenant, or to a personal Microsoft account, which Entra doesn't log here.
-            {" "}<button className="btn sm" onClick={lookUp}>Check again</button>
+            {" "}<ActionButton className="btn sm" busy="Checking Entra's log…" onClick={async () => { await lookUp(); return "Checked again"; }}>Check again</ActionButton>
           </p>
         ) : (
           <p className="small muted" style={{ margin: 0 }}>Looking for this sign-in in Entra's log…</p>
         )}
-      </section>
+      </Section>
     );
   }
 
@@ -237,7 +238,7 @@ export function EntraVerdict({ capture }: { capture: FlowCapture }) {
     ["Correlation ID", last.correlationId],
   ];
   return (
-    <section className="panel stack" aria-label="Entra's verdict">
+    <Section className="panel stack" aria-label="Entra's verdict">
       {head}
       <div className="findings">
         <div className={`finding ${TONE[v.tone]}`}>
@@ -268,6 +269,6 @@ export function EntraVerdict({ capture }: { capture: FlowCapture }) {
         </table>
         <CodeBlock code={JSON.stringify(state.m.records, null, 2)} />
       </details>
-    </section>
+    </Section>
   );
 }

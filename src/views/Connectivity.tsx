@@ -15,6 +15,7 @@ import {
   type ResultStatus,
 } from "../lib/connectivity";
 import { WORKDIR } from "../data/workdir";
+import { Section } from "../components/Section";
 
 const STATUS_SEV: Record<ResultStatus, string> = { pass: "ok", warn: "warn", fail: "critical" };
 const STATUS_LABEL: Record<ResultStatus, string> = { pass: "Pass", warn: "Warning", fail: "Fail" };
@@ -102,7 +103,7 @@ explorer.exe "/select,$($f.FullName)"`;
         </div>
       </div>
 
-      <section className="panel stack">
+      <Section className="panel stack">
         <div className="panel-head"><h2>1. Choose the apps to test</h2><span className="sub">{chosen.length} of {visible.length} chosen</span></div>
         {loading ? (
           <p className="small muted">Loading the inventory…</p>
@@ -139,9 +140,9 @@ explorer.exe "/select,$($f.FullName)"`;
             No device-reachable URL recorded for: {skipped.map((a) => a.name).join(", ")}. Localhost, plain HTTP and reserved example names are skipped; the identity provider checks still cover them.
           </p>
         )}
-      </section>
+      </Section>
 
-      <section className="panel stack">
+      <Section className="panel stack">
         <div className="panel-head"><h2>2. The test plan</h2><span className="sub">Plan {plan.id} · {plan.tests.length} checks</span></div>
         {plan.fallback && (
           <div className="callout">
@@ -170,9 +171,9 @@ explorer.exe "/select,$($f.FullName)"`;
         <p className="small muted" style={{ margin: 0 }}>
           Every check is anonymous: a DNS lookup, a TCP connect, a TLS handshake, a plain GET, or a clock comparison. No credentials or tokens are sent. Behind a proxy the script uses the proxy Windows would use and reports which path worked. A TLS certificate from an unexpected issuer on login.microsoftonline.com is flagged as TLS inspection.
         </p>
-      </section>
+      </Section>
 
-      <section className="panel stack">
+      <Section className="panel stack">
         <div className="panel-head"><h2>3. Try it on this PC</h2><span className="sub">Optional, before you send it to devices</span></div>
         <div className="row">
           <ActionButton className="btn primary" busy="Building plan…" disabled={!plan.tests.length} onClick={() => save(planFile, JSON.stringify(plan, null, 2), "application/json")}>Download {planFile}</ActionButton>
@@ -180,9 +181,9 @@ explorer.exe "/select,$($f.FullName)"`;
         </div>
         <p className="small" style={{ margin: 0 }}>The file lands in your Downloads folder. Then paste this into PowerShell 7. It runs the script from the folder you cloned Federation 360 into, prints a summary line and the full path of the result file, and opens File Explorer with that file selected. Drag the file onto the box in step 5, or use Choose files there.</p>
         <CodeBlock code={localRun} />
-      </section>
+      </Section>
 
-      <section className="panel stack">
+      <Section className="panel stack">
         <div className="panel-head"><h2>4. Send it to devices through Remediation 360</h2><span className="sub">Signed, four-eyes, canary first</span></div>
         <div className="row">
           <ActionButton className="btn primary" busy="Building script…" disabled={!plan.tests.length} onClick={() => save("detect.ps1", detect)}>Download detect.ps1</ActionButton>
@@ -227,9 +228,9 @@ explorer.exe "/select,$($f.FullName)"`;
         <p className="small muted" style={{ margin: 0 }}>
           Run as System uses the machine's WinHTTP proxy, not the signed-in user's browser proxy. If users sign in through a proxy that only the user profile knows about, the System run can fail where browsers work; the result shows which proxy each run saw.
         </p>
-      </section>
+      </Section>
 
-      <section className="panel stack">
+      <Section className="panel stack">
         <div className="panel-head"><h2>5. Read the results</h2><span className="sub">{parsed.reports.length} device{parsed.reports.length === 1 ? "" : "s"}</span></div>
         <p className="small" style={{ margin: 0 }}>
           Where the result files are: from the step 3 run on this PC, <span className="mono">{WORKDIR}\connectivity\results</span> (the step 3 block prints the exact path); on devices that ran it through Intune, <span className="mono">C:\ProgramData\F360\results</span>. Each run writes one <span className="mono">&lt;device&gt;-&lt;time&gt;.json</span>. Drag files onto the box below or use Choose files. You can also drop an Intune device status export or paste <span className="mono">F360|v1|…</span> lines. Nothing leaves this page.
@@ -286,7 +287,7 @@ explorer.exe "/select,$($f.FullName)"`;
             </div>
           </>
         )}
-      </section>
+      </Section>
 
       <details className="panel">
         <summary>Show the script template ({scriptTemplate.split("\n").length} lines)</summary>

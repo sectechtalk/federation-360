@@ -4,6 +4,7 @@ import { ActionButton } from "../components/busy";
 import { checkSaml, decodeSamlInput, parseSaml, type ParsedSaml } from "../lib/saml";
 import { SAML_SAMPLES } from "../data/samples";
 import type { Finding } from "../lib/types";
+import { Section } from "../components/Section";
 
 const prettyXml = (xml: string) => {
   let out = "";
@@ -91,7 +92,8 @@ export default function SamlTool() {
         </div>
       </div>
 
-      <section className="panel stack">
+      <Section className="panel stack">
+        <h2>Decode a SAML message</h2>
         <div className="spread">
           <span className="eyebrow">Try an example</span>
           <div className="row">
@@ -117,23 +119,23 @@ export default function SamlTool() {
             <input id="saml-skew" className="input" inputMode="numeric" value={skew} onChange={(e) => setSkew(e.target.value)} />
           </label>
         </div>
-      </section>
+      </Section>
 
       {error && <div className="callout warn">{error}</div>}
 
       {parsed && (
         <>
-          <section className="stack">
+          <Section className="stack">
             <div className="spread">
               <h2>{parsed.kind === "AuthnRequest" ? "Request findings" : "Findings"}</h2>
               <SummaryBar findings={findings} />
             </div>
             {!app && <p className="small muted">Pick an app above to compare Audience, ACS, Issuer and certificate with your inventory.</p>}
             <FindingList findings={findings} />
-          </section>
+          </Section>
 
           <div className="grid-2">
-            <section className="panel">
+            <Section className="panel">
               <div className="panel-head"><h2>What's inside</h2><span className="sub">{parsed.kind}</span></div>
               <dl className="kv">
                 <dt>Issuer</dt><dd>{a?.issuer || parsed.issuer || "—"}</dd>
@@ -161,8 +163,8 @@ export default function SamlTool() {
                   </>
                 )}
               </dl>
-            </section>
-            <section className="panel stack">
+            </Section>
+            <Section className="panel stack">
               <div className="panel-head"><h2>Signature</h2><span className="sub">{parsed.signatures.length} found</span></div>
               {parsed.signatures.length === 0 && <p className="muted">No XML signature in this message.{parsed.kind === "AuthnRequest" ? " Requests are often unsigned; that's normal unless the IdP requires signed requests." : ""}</p>}
               {parsed.signatures.map((s, i) => (
@@ -179,11 +181,11 @@ export default function SamlTool() {
                   )}
                 </dl>
               ))}
-            </section>
+            </Section>
           </div>
 
           {a && a.attributes.length > 0 && (
-            <section className="stack">
+            <Section className="stack">
               <h2>Attributes (claims)</h2>
               <div className="table-wrap">
                 <table>
@@ -195,7 +197,7 @@ export default function SamlTool() {
                   </tbody>
                 </table>
               </div>
-            </section>
+            </Section>
           )}
 
           <details>

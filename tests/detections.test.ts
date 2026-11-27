@@ -106,6 +106,14 @@ test("the sample log fires every rule once, and nothing on the ordinary sign-ins
   expect(byRule["token-replay"].map((h) => h.user)).toEqual(["frankie.mac@f360sample.onmicrosoft.com"]);
   expect(byRule["new-country-mfa-change"].map((h) => h.user)).toEqual(["casey.helpdesk@f360sample.onmicrosoft.com"]);
   expect(byRule["consent-after-suspicious"].map((h) => h.title)).toEqual([expect.stringMatching(/^Consented to Northwind Meeting Notes after: 5 MFA prompts/)]);
+  expect(byRule["risky-signin"].map((h) => [h.user, h.severity])).toEqual([
+    ["casey.helpdesk@f360sample.onmicrosoft.com", "warn"],
+    ["gray.finance@f360sample.onmicrosoft.com", "critical"],
+  ]);
+  expect(byRule["risky-then-change"].map((h) => [h.user, h.title])).toEqual([
+    ["casey.helpdesk@f360sample.onmicrosoft.com", "User registered security info 20 minutes after a medium-risk sign-in"],
+    ["gray.finance@f360sample.onmicrosoft.com", "Add member to role (Global Administrator) 25 minutes after a high-risk sign-in"],
+  ]);
 });
 
 test("reads Log Analytics columns, Graph Explorer pages and audit rows; rejects other files with plain words", () => {

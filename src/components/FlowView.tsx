@@ -4,6 +4,7 @@ import { ActionButton, BusyNote, downloadFile } from "./busy";
 import { ACTOR_LABEL, KIND_LABEL, analyzeCapture, redactCapture, type FlowAnalysis, type FlowCapture } from "../lib/flow";
 import { CLAIM_HELP } from "../lib/jwt";
 import { worst } from "../lib/health";
+import { Section } from "./Section";
 
 const time = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "");
 
@@ -58,7 +59,7 @@ export function FlowView({ capture: latest }: { capture: FlowCapture }) {
 
   return (
     <div className="stack">
-      <section className="panel stack">
+      <Section className="panel stack" id="flow-summary">
         <div className="spread">
           <div>
             <div className="eyebrow">{KIND_LABEL[capture.kind]} · {new Date(capture.startedAt).toLocaleString()} · {capture.steps.length} {capture.steps.length === 1 ? "hop" : "hops"}</div>
@@ -70,7 +71,7 @@ export function FlowView({ capture: latest }: { capture: FlowCapture }) {
           </div>
         </div>
         <FindingList findings={a.overall} />
-      </section>
+      </Section>
 
       <ol className="flow-steps">
         {capture.steps.map((s, i) => {

@@ -4,7 +4,11 @@ import { ActionButton, downloadFile } from "../components/busy";
 import { EMPTY_LOGS, mergeLogs, readLogFile, type LoadedLogs } from "../detections/events";
 import { RULES, runDetections, type Hit } from "../detections/rules";
 import { sampleSignInLog } from "../detections/sample";
+import type { TenantRead } from "../detections/live";
+import { TenantLogReader } from "../components/TenantLogReader";
+import { handOff } from "../lib/caseHandoff";
 import exportScript from "../../detections/Export-F360SignIns.ps1?raw";
+import { Section } from "../components/Section";
 
 const SCRIPT_NAME = "Export-F360SignIns.ps1";
 const ruleTitle = (id: string) => RULES.find((r) => r.id === id)?.title ?? id;
@@ -46,6 +50,11 @@ export default function Detections() {
     return downloadFile(`f360-detections-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ generatedAt: new Date().toISOString(), sources: logs.sources, hits }, null, 2), "application/json");
   };
   const downloadScript = async () => downloadFile(SCRIPT_NAME, exportScript);
+  const onTenantRead = (r: TenantRead) => {
+    setLogs((prev) => mergeLogs(sample ? EMPTY_LOGS : prev, r.logs));
+    setSample(false);
+    setError(null);
+  };
 
   return (
     <div className="page">
@@ -68,7 +77,7 @@ export default function Detections() {
 
       {error && <div className="callout crit">{error}</div>}
 
-      <section className="panel stack">
+      <Section className="panel stack">
         <div className="panel-head"><h2>Load logs</h2><span className="sub">Sign-in logs, plus audit logs for two of the rules</span></div>
         <div className="grid-2">
           <div className="stack small">
@@ -87,10 +96,17 @@ export default function Detections() {
               <ActionButton busy="Preparing the script…" onClick={downloadScript}>Download {SCRIPT_NAME}</ActionButton>
             </div>
             <CodeBlock code={`cd $HOME\\Downloads\nUnblock-File .\\${SCRIPT_NAME}\n.\\${SCRIPT_NAME} -TenantId <your-tenant-id> -Days 7`} />
+            <h3>From Entity 360</h3>
+            <p>
+              Open the person in Entity 360, then export the timeline as CSV and load the file here. Its sign-in rows have the time, app, result and IP address, but no
+              country, error code or risk level, so only rules that don't need those can use them. For one sign-in with everything, open it in Entity 360, expand{" "}
+              <strong>Raw source evidence</strong>, copy it into a .json file and load that.
+            </p>
           </div>
+
           <div className="stack">
-            <label className="small" htmlFor="det-files"><strong>Load one or more JSON files</strong> (sign-ins and audits can be separate files)</label>
-            <input id="det-files" className="input" type="file" multiple accept=".json,application/json" onChange={(e) => onFiles(e.target.files)} />
+            <label className="small" htmlFor="det-files"><strong>Load one or more files</strong>: JSON sign-in or audit logs, or an Entity 360 timeline CSV</label>
+            <input id="det-files" className="input" type="file" multiple accept=".json,.csv,application/json,text/csv" onChange={(e) => onFiles(e.target.files)} />
             <div className="row">
               <span className="small muted">Just looking?</span>
               <ActionButton busy="Loading the sample…" onClick={loadSample}>Load sample logs with every attack</ActionButton>
@@ -103,7 +119,16 @@ export default function Detections() {
             )}
           </div>
         </div>
-      </section>
+      </Section>
+
+      <Section className="panel stack">
+        <div className="panel-head"><h2>Read from your tenant</h2><span className="sub">Entra ID P1 or higher; risk levels need P2 (Microsoft 365 E5 and E7 include it)</span></div>
+        <p className="small" style={{ margin: 0 }}>
+          Reads interactive and non-interactive sign-ins (with session IDs and Entra ID Protection's risk level) and audit events straight from Microsoft Graph, read-only,
+          with your own sign-in. Nothing leaves this browser tab, and Federation 360 never changes the tenant.
+        </p>
+        <TenantLogReader onRead={onTenantRead} />
+      </Section>
 
       {results && (
         <>
@@ -114,7 +139,7 @@ export default function Detections() {
             <div><span className="n">{logs.signIns.length}</span><span className="l">Sign-ins checked</span></div>
           </div>
 
-          <section className="panel stack">
+          <Section className="panel stack">
             <div className="panel-head"><h2>What fired</h2><span className="sub">Critical first, newest first</span></div>
             {hits.length === 0 ? (
               <p>Nothing fired. Check the rules list below for any that couldn't run on these logs.</p>
@@ -129,18 +154,21 @@ export default function Detections() {
                         <div className="title"><Sev s={h.severity} /><span>{h.title}</span></div>
                         <div className="detail small"><strong>{h.user}</strong> · {new Date(h.time).toLocaleString()} · {ruleTitle(h.rule)} · ATT&amp;CK {rule.attack.id}</div>
                         <ul className="plain small mono">{h.evidence.map((e) => <li key={e}>{e}</li>)}</ul>
-                        <div><button className="btn sm" onClick={() => go("playbooks", { id: rule.playbook })}>Respond: open the playbook</button></div>
+                        <div className="row">
+                          <button className="btn sm primary" onClick={() => { handOff({ logs, hits, label: `Detections: ${logs.sources.length} source${logs.sources.length === 1 ? "" : "s"}, ${new Date().toISOString()}` }); go("investigate", { user: h.user.split(", ")[0] }); }}>Investigate this person</button>
+                          <button className="btn sm" onClick={() => go("playbooks", { id: rule.playbook })}>Respond: open the playbook</button>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
-          </section>
+          </Section>
         </>
       )}
 
-      <section className="panel stack">
+      <Section className="panel stack">
         <div className="panel-head"><h2>The rules</h2><span className="sub">{RULES.length} rules, each with tests in tests/detections.test.ts</span></div>
         {RULES.map((r) => {
           const res = results?.find((x) => x.rule.id === r.id);
@@ -163,7 +191,7 @@ export default function Detections() {
             </details>
           );
         })}
-      </section>
+      </Section>
     </div>
   );
 }

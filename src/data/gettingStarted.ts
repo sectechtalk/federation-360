@@ -66,9 +66,9 @@ export const START_STEPS: StartStep[] = [
     phase: "first",
     title: "Learn what SAML, OIDC, OAuth and SCIM actually do",
     why: "Every page in Federation 360 uses a handful of words over and over. Twenty minutes on the Learn page makes the rest of Federation 360 readable.",
-    how: "Read the four protocol cards and the one-sentence difference between sign-in and permission. Click through each flow under How the messages flow. Keep the Glossary at the bottom open when a word is new.",
+    how: "Start with the SSO vs OAuth vs OIDC vs SAML animation at the top of Learn: it shows which one proves who you are, which one grants an app access, and how they fit together. Then read the four protocol cards and click through each flow under How the messages flow. Keep the Glossary at the bottom open when a word is new.",
     minutes: "20 min",
-    open: { label: "Open Learn", route: "learn" },
+    open: { label: "Open SSO vs OAuth vs OIDC vs SAML", route: "learn", params: { section: "sso-oauth-oidc-saml" } },
   },
   {
     id: "lab",
@@ -87,6 +87,15 @@ export const START_STEPS: StartStep[] = [
     how: "On Learn, the Lifecycle section walks one example app (an expenses app) through all three stages for SAML, OIDC and SCIM. Every step says where to click and what success looks like.",
     minutes: "90 min",
     open: { label: "Open the lifecycle walkthrough", route: "learn" },
+  },
+  {
+    id: "flow-training",
+    phase: "first",
+    title: "Learn to troubleshoot a sign-in with Flow tracer",
+    why: "\"I can't sign in\" is the request you will get most. Flow tracer shows every step of a sign-in and where it stopped. Practising on examples, and on sign-ins you break yourself in the lab, means the first real one isn't your first.",
+    how: "On Learn, the Flow tracer training is seven short exercises. Each one says where to click and what success looks like. Exercises 1, 2, 3 and 7 need only your browser, exercises 4 and 5 use your lab, and exercise 6 needs a tenant with Entra ID P1 or higher.",
+    minutes: "45 min",
+    open: { label: "Open the Flow tracer training", route: "learn", params: { section: "flow-training" } },
   },
   {
     id: "discover",

@@ -1,13 +1,16 @@
-# Security gate (360 standard, 2026-11-15). Runs on every PR, on main, and weekly so new advisories surface.
+# Security gate (360 standard, 2026-11-15). Runs on every PR and weekly so new advisories surface.
 # $0: GitHub-hosted runners and free tools only. Actions are pinned to commit SHAs; Dependabot keeps them current.
 name: security
+# Minutes budget (2026-11-27): no second run on main after a squash merge (the PR already ran the same code),
+# and a newer push to a PR cancels the older run.
 on:
   pull_request:
-  push:
-    branches: [main]
   schedule:
     - cron: '17 14 * * 1'
   workflow_dispatch:
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
   pull-requests: read # gitleaks reads the PR's commit range
@@ -49,3 +52,7 @@ jobs:
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The action downloads gitleaks into the temp folder and leaves the download there. On a runner that outlives
+          # the job, the next run finds the old file and stops before it scans anything. The runner's own temp folder
+          # is emptied for every job, so the download always starts clean.
+          TMPDIR: ${{ runner.temp }}

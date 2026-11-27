@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Ctx, useToastState, type AppCtx } from "./components/ui";
 import { useClickAck } from "./components/busy";
+import { FoldAllBar } from "./components/Section";
 import { useCollection, useStore } from "./lib/store";
 import type { AppIntegration, Tenant } from "./lib/types";
 import { exampleData } from "./data/seed";
@@ -22,6 +23,10 @@ import Connectivity from "./views/Connectivity";
 import Grants from "./views/Grants";
 import Posture from "./views/Posture";
 import Detections from "./views/Detections";
+import AccessEnds from "./views/AccessEnds";
+import Activity from "./views/Activity";
+import UserLookup from "./views/UserLookup";
+import Investigate from "./views/Investigate";
 import { AppSwitcher, NavIcon, NavSection, ThemeToggle, useNavDrawer } from "./360/Shell360";
 
 const ROUTES = [
@@ -33,6 +38,10 @@ const ROUTES = [
   { id: "posture", label: "MFA and SSO coverage", group: "Protect", icon: "fingerprint", el: Posture },
   { id: "grants", label: "OAuth grants", group: "Protect", icon: "key-round", el: Grants },
   { id: "detections", label: "Detections", group: "Protect", icon: "siren", el: Detections },
+  { id: "investigate", label: "Investigate", group: "Protect", icon: "file-search", el: Investigate },
+  { id: "access", label: "How access ends", group: "Protect", icon: "door-open", el: AccessEnds },
+  { id: "activity", label: "Activity", group: "Protect", icon: "activity", el: Activity },
+  { id: "userlookup", label: "User lookup", group: "Protect", icon: "circle-user", el: UserLookup },
   { id: "flowtracer", label: "Flow tracer", group: "Troubleshoot", icon: "radar", el: FlowTracer },
   { id: "livetest", label: "Live test", group: "Troubleshoot", icon: "test-tube", el: LiveTest },
   { id: "connectivity", label: "Connectivity test", group: "Troubleshoot", icon: "monitor-dot", el: Connectivity },
@@ -48,9 +57,20 @@ const ROUTES = [
 // The page Federation 360 opens on when the address has no #page (or an unknown one).
 const DEFAULT_ROUTE = "start";
 
+// The address names the page: "#learn". A section can follow a slash, "#learn/flow-training", and the page opens
+// with that section open, so a link can point straight at it.
+const hashParts = () => location.hash.replace(/^#/, "").split("/");
 const routeFromHash = () => {
-  const h = location.hash.replace(/^#/, "");
+  const h = hashParts()[0];
   return ROUTES.some((r) => r.id === h) ? h : DEFAULT_ROUTE;
+};
+const sectionFromHash = () => {
+  const [h, section] = hashParts();
+  return section && ROUTES.some((r) => r.id === h) ? section : undefined;
+};
+const paramsFromHash = (): Record<string, string> => {
+  const section = sectionFromHash();
+  return section ? { section } : {};
 };
 
 function Mark() {
@@ -65,7 +85,7 @@ function Mark() {
 
 export default function App() {
   const [route, setRoute] = useState(routeFromHash);
-  const [params, setParams] = useState<Record<string, string>>({});
+  const [params, setParams] = useState<Record<string, string>>(paramsFromHash);
   const store = useStore();
   const t = useCollection<Tenant>(store, "tenants");
   const a = useCollection<AppIntegration>(store, "apps");
@@ -74,7 +94,11 @@ export default function App() {
   useClickAck(toast);
 
   useEffect(() => {
-    const on = () => setRoute(routeFromHash());
+    const on = () => {
+      setRoute(routeFromHash());
+      // A link that names a section opens it. A plain "#page" leaves the parameters a button just set alone.
+      if (sectionFromHash()) setParams(paramsFromHash());
+    };
     addEventListener("hashchange", on);
     return () => removeEventListener("hashchange", on);
   }, []);
@@ -166,6 +190,9 @@ export default function App() {
               <div className="callout warn">The saved inventory couldn't be loaded: {t.error || a.error}. The tools still work; reload to try again.</div>
             </div>
           )}
+          <div className="page">
+            <FoldAllBar toast={toast} />
+          </div>
           <View key={route + JSON.stringify(params)} />
         </main>
       </div>

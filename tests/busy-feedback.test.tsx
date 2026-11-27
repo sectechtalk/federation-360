@@ -82,7 +82,7 @@ test("App pulses every other button and says which page a button opened", () => 
 
 // Sweep guard: a plain <button> may navigate, open a drawer or flip a setting (the click pulse and the page change are the
 // feedback). Anything that saves, downloads, copies, fetches, signs in or loads must be an ActionButton.
-const WORK = /\b(save|download\w*|copy\w*|apply|refresh|checkNow|run[A-Z]\w*|doImport|tryFetch|fetch|loadExamples|loadSample|sample|trySample|clearExamples|del|signIn|startSignIn|open)\s*\(|onClick=\{(save|download\w*|apply|refresh|checkNow|run[A-Z]\w*|doImport|loadExamples|clearExamples|del|clear|signIn)\}/;
+const WORK = /\b(save|download\w*|copy\w*|apply|refresh|checkNow|run[A-Z]\w*|doImport|tryFetch|fetch|loadExamples|loadSample|sample|trySample|clearExamples|del|signIn|startSignIn|signOut|lookUp|setRun|open)\s*\(|onClick=\{(save|download\w*|apply|refresh|checkNow|run[A-Z]\w*|doImport|loadExamples|clearExamples|del|clear|signIn|lookUp)\}/;
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => (statSync(join(dir, f)).isDirectory() ? files(join(dir, f)) : /\.tsx$/.test(f) ? [join(dir, f)] : []));
 }

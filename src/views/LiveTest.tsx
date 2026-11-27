@@ -7,6 +7,7 @@ import { KIND_LABEL, type FlowCapture } from "../lib/flow";
 import { captureStore, DEFAULT_TESTAPP_URL, finishOidcTest, hasLiveTestResult, hasReturnedCapture, isAllowedTestAppUrl, startOidcTest, takeReturnedCapture, testApp, type CaptureSummary, type TestAppConfig } from "../lib/livetest";
 import { browserSignInBlocker } from "../lib/discovery/entraLive";
 import { WORKDIR } from "../data/workdir";
+import { Section, openSection } from "../components/Section";
 
 const START = `cd ${WORKDIR}
 git pull
@@ -92,6 +93,10 @@ export default function LiveTest() {
   }, [url]);
 
   useEffect(() => setDraftUrl(url), [url]);
+  // A capture you opened or just ran shows its summary section open, and the page scrolls to it.
+  useEffect(() => {
+    if (capture) openSection("flow-summary", true);
+  }, [capture]);
 
   const useAddress = (u: string) => {
     const v = u.trim().replace(/\/+$/, "");
@@ -108,7 +113,6 @@ export default function LiveTest() {
   const open = async (id: string) => {
     setError(null);
     setCapture(await captures.capture(id));
-    window.scrollTo({ top: document.getElementById("live-result")?.offsetTop ?? 0, behavior: "smooth" });
     return "Opened below";
   };
 
@@ -156,7 +160,7 @@ export default function LiveTest() {
       )}
 
       {!cfg && !mixed && (
-        <section className="panel stack">
+        <Section className="panel stack">
           <div className="panel-head"><h2>Start the test app</h2><span className="sub">{reachErr ? "Not reachable" : <span className="row" role="status"><Spinner /> Checking…</span>}</span></div>
           <p className="small" style={{ margin: 0 }}>
             The test app runs in Docker next to Federation 360, at <span className="mono">{url}</span>. If it isn't running yet, run this in PowerShell 7. It signs you in to the lab tenant, finds the lab apps, creates a certificate for the client credentials test, and starts the container.
@@ -178,7 +182,7 @@ export default function LiveTest() {
             {draftUrl !== url && <button className="btn" onClick={() => useAddress(draftUrl)}>Use this address</button>}
             {url !== DEFAULT_TESTAPP_URL && <button className="btn" onClick={() => useAddress(DEFAULT_TESTAPP_URL)}>Use the one on this PC</button>}
           </div>
-        </section>
+        </Section>
       )}
 
       {cfg && !cfg.configured && (
@@ -186,7 +190,7 @@ export default function LiveTest() {
       )}
 
       {cfg?.configured && (
-        <section className="panel stack">
+        <Section className="panel stack">
           <div className="spread">
             <div>
               <div className="eyebrow">Lab tenant</div>
@@ -212,7 +216,7 @@ export default function LiveTest() {
             )}
           </div>
           <div className="test-grid">
-            <div className="panel stack">
+            <Section className="panel stack">
               <div className="panel-head"><h2>SAML</h2><span className="sub">Test app as the service provider</span></div>
               <p className="small" style={{ margin: 0 }}>The test app sends a SAML request to Entra, you sign in as a lab user, and Entra posts a signed SAML response back to the test app.</p>
               {cfg.saml ? (
@@ -225,28 +229,28 @@ export default function LiveTest() {
                   <span className="small muted">The broken runs end on a Microsoft error page. Note the AADSTS code, come back here and open the capture to compare.</span>
                 </div>
               ) : <span className="small muted">Not set up: LAB-TestApp-SAML wasn't found. Run the lab workflow, then the start script again.</span>}
-            </div>
+            </Section>
 
-            <div className="panel stack">
+            <Section className="panel stack">
               <div className="panel-head"><h2>OpenID Connect</h2><span className="sub">Federation 360 as the client</span></div>
               <p className="small" style={{ margin: 0 }}>Federation 360 signs you in with authorization code and PKCE, gets an ID token and an access token for LAB-API, and hands the access token to the test API to check.</p>
               {cfg.oidc ? <ActionButton className="btn primary" busy="Opening Microsoft sign-in…" onClick={runOidc} disabled={!!busy}>Run OIDC sign-in</ActionButton> : <span className="small muted">Not set up: F360-LiveTest or LAB-API wasn't found.</span>}
-            </div>
+            </Section>
 
-            <div className="panel stack">
+            <Section className="panel stack">
               <div className="panel-head"><h2>Client credentials</h2><span className="sub">Test app as a daemon</span></div>
               <p className="small" style={{ margin: 0 }}>The test app signs in as LAB-Daemon with a certificate (no secret), gets an app-only token for LAB-API, and checks it like an API would.</p>
               {cfg.clientCredentials ? <ActionButton className="btn primary" busy="Asking Entra for a token…" onClick={runCc} disabled={!!busy}>Run client credentials</ActionButton> : <span className="small muted">{onAzure ? "Not set up: run the Azure deploy script again; it copies the certificate from your PC." : "Not set up: the start script creates the certificate."}</span>}
-            </div>
+            </Section>
           </div>
           {busy && <BusyNote className="small muted">{busy}</BusyNote>}
-        </section>
+        </Section>
       )}
 
       {error && <div className="callout warn">{error}</div>}
 
       {list.length > 0 && (
-        <section className="stack">
+        <Section className="stack">
           <div className="spread">
             <h2>Recent runs</h2>
             <ActionButton className="btn sm danger" busy="Deleting…" onClick={clear}>Delete all</ActionButton>
@@ -266,7 +270,7 @@ export default function LiveTest() {
               </tbody>
             </table>
           </div>
-        </section>
+        </Section>
       )}
 
       <div id="live-result">{capture && <FlowView capture={capture} />}</div>

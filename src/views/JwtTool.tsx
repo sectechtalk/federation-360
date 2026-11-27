@@ -3,6 +3,7 @@ import { useApp, AppPicker, FindingList, SummaryBar, CodeBlock, Seg, Sev } from 
 import { checkJwt, CLAIM_HELP, decodeJwt, verifyJwt, type DecodedJwt, type VerifyResult } from "../lib/jwt";
 import { makeJwtSample } from "../data/samples";
 import { ActionButton } from "../components/busy";
+import { Section } from "../components/Section";
 
 const TIME_CLAIMS = ["exp", "nbf", "iat", "auth_time"];
 
@@ -70,7 +71,8 @@ export default function JwtTool() {
         </div>
       </div>
 
-      <section className="panel stack">
+      <Section className="panel stack">
+        <h2>Decode a token</h2>
         <div className="spread">
           <span className="eyebrow">Try an example</span>
           <div className="row">
@@ -91,7 +93,7 @@ export default function JwtTool() {
             <Seg label="Evaluation time" value={evalMode} onChange={setEvalMode} options={[{ v: "now", l: "Now" }, { v: "issued", l: "When it was issued" }]} />
           </label>
         </div>
-      </section>
+      </Section>
 
       {error && <div className="callout warn">{error}</div>}
 
@@ -104,12 +106,12 @@ export default function JwtTool() {
             </div>
           </div>
 
-          <section className="stack">
+          <Section className="stack">
             <div className="spread"><h2>Findings</h2><SummaryBar findings={findings} /></div>
             <FindingList findings={findings} />
-          </section>
+          </Section>
 
-          <section className="stack">
+          <Section className="stack">
             <h2>Claims</h2>
             <div className="table-wrap">
               <table>
@@ -128,14 +130,14 @@ export default function JwtTool() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </Section>
 
           <div className="grid-2">
-            <section className="panel stack">
+            <Section className="panel stack">
               <div className="panel-head"><h2>Header</h2></div>
               <CodeBlock code={JSON.stringify(t.header, null, 2)} />
-            </section>
-            <section className="panel stack">
+            </Section>
+            <Section className="panel stack">
               <div className="panel-head"><h2>Verify signature</h2>{verify && <Sev s={verify.ok ? "ok" : "critical"} label={verify.ok ? "Valid" : "Failed"} />}</div>
               <p className="small muted">
                 {/^HS/.test(t.header.alg)
@@ -145,7 +147,7 @@ export default function JwtTool() {
               <textarea aria-label="JWKS or secret" className="input" rows={6} value={keys} onChange={(e) => { setKeys(e.target.value); setVerify(null); }} placeholder='{"keys":[{"kty":"RSA","kid":"…","n":"…","e":"AQAB"}]}' spellCheck={false} />
               <div className="row"><ActionButton className="btn primary" busy="Verifying…" onClick={runVerify} disabled={!keys.trim()}>Verify</ActionButton></div>
               {verify && <div className={`callout ${verify.ok ? "" : "warn"} small`}>{verify.message}</div>}
-            </section>
+            </Section>
           </div>
         </>
       )}

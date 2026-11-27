@@ -5,6 +5,7 @@ import { WIZARDS, type Wizard } from "../data/wizards";
 import { usePref } from "../lib/store";
 import { blankApp } from "./Inventory";
 import { PROTOCOLS } from "../lib/protocols";
+import { Section } from "../components/Section";
 
 function Runner({ w, onExit }: { w: Wizard; onExit: () => void }) {
   const { tenants, store, toast, go } = useApp();
@@ -48,7 +49,8 @@ function Runner({ w, onExit }: { w: Wizard; onExit: () => void }) {
             </button>
           ))}
         </nav>
-        <section className="panel stack">
+        <Section className="panel stack">
+          <h2>{isSummary ? "Summary and save" : `Step ${s + 1} of ${total}: ${cur.title}`}</h2>
           {!isSummary ? (
             <>
               <div className="eyebrow">Step {s + 1} of {total}</div>
@@ -96,7 +98,7 @@ function Runner({ w, onExit }: { w: Wizard; onExit: () => void }) {
               ))}
               <h3>Test plan</h3>
               <ol className="actions">{w.testPlan.map((t, i) => <li key={i}>{t}</li>)}</ol>
-              <div className="panel stack" style={{ background: "var(--surface-2)" }}>
+              <Section className="panel stack" style={{ background: "var(--surface-2)" }}>
                 <h3>Save to inventory</h3>
                 {tenants.length ? (
                   <div className="grid-2">
@@ -113,10 +115,10 @@ function Runner({ w, onExit }: { w: Wizard; onExit: () => void }) {
                   <ActionButton className="btn primary" busy="Saving…" onClick={save} disabled={!tenants.length}>Save as a new integration</ActionButton>
                   <button className="btn" onClick={() => { setValues({}); setStep(0); toast("Wizard cleared"); }}>Start over</button>
                 </div>
-              </div>
+              </Section>
             </>
           )}
-        </section>
+        </Section>
       </div>
     </div>
   );

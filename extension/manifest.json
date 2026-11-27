@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Federation 360 Capture",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Shows every SAML, OpenID Connect and OAuth sign-in in Federation 360's Flow tracer as it happens. Keeps only sign-in hops, in browser memory, and sends nothing anywhere else.",
   "permissions": [
     "webRequest",
@@ -21,8 +21,10 @@
   "content_scripts": [
     {
       "matches": [
-        "http://localhost/*",
-        "http://127.0.0.1/*",
+        "http://localhost:5173/*",
+        "http://127.0.0.1:5173/*",
+        "http://localhost:8080/*",
+        "http://127.0.0.1:8080/*",
         "https://sectechtalk.github.io/federation-360/*"
       ],
       "js": [
