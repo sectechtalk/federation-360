@@ -76,7 +76,7 @@ function oidcHar(idToken: string, nonce: string) {
 
 test("OIDC HAR: authorize, code and token hops; secrets are never kept; nonce is checked", async () => {
   const { token } = await makeJwtSample("id"); // nonce n-0S6_WzA2Mj, aud 5d1e2f3a-...
-  const c = parseHar(oidcHar(token, "n-0S6_WzA2Mj"));
+  const c = parseHar(oidcHar(token, "n-0S6_WzA2Mj")); // gitleaks:allow (OIDC spec sample nonce)
   expect(c.kind).toBe("oidc");
   expect(c.steps.map((s) => s.label)).toEqual([
     expect.stringContaining("authorize request"),
@@ -98,7 +98,7 @@ test("OIDC HAR: authorize, code and token hops; secrets are never kept; nonce is
 
 test("redaction removes codes, token signatures and SAML signature values but keeps them decodable", async () => {
   const { token } = await makeJwtSample("id");
-  const c = parseHar(oidcHar(token, "n-0S6_WzA2Mj"));
+  const c = parseHar(oidcHar(token, "n-0S6_WzA2Mj")); // gitleaks:allow (OIDC spec sample nonce)
   const r = await redactCapture(c);
   const json = JSON.stringify(r);
   expect(json).not.toContain("0.AAA-code");

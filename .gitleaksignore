@@ -1,3 +1,7 @@
 # gitleaks false positive: the browser storage key name "f360.nav.collapsed" in src/360/Shell360.tsx, as first
 # committed to the public federation-360 repo. Not a secret. Newer copies carry an inline gitleaks:allow.
 dd5e1df88be979776541924e5e06b4f519252eda:src/360/Shell360.tsx:generic-api-key:123
+# gitleaks false positive: "n-0S6_WzA2Mj" in tests/flow.test.ts is the sample nonce from the OpenID Connect
+# Core spec, used by the generated test token. Not a secret.
+dd5e1df88be979776541924e5e06b4f519252eda:tests/flow.test.ts:generic-api-key:79
+dd5e1df88be979776541924e5e06b4f519252eda:tests/flow.test.ts:generic-api-key:101
