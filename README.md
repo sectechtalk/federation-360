@@ -30,6 +30,11 @@ It runs in your browser. Nothing you paste into it is sent anywhere.
 
 ## What's inside
 
+Every page works the same way. Each section folds: it starts collapsed so the page fits on one screen, and its
+heading row or its **Expand** button opens it, while **Expand all** and **Collapse all** sit above every page. Every
+button shows that it is working (for example "Searching…" with a seconds counter), then a tick with what happened or
+a cross with the exact error. Light and dark themes follow your system, or switch them at the bottom of the left rail.
+
 **Getting started**
 
 | Page | What it does |
@@ -74,7 +79,7 @@ It runs in your browser. Nothing you paste into it is sent anywhere.
 
 | Page | What it does |
 | --- | --- |
-| Learn | How to create, maintain and remove each kind of integration, sequence diagrams of every flow, a glossary and a troubleshooting method. Includes **Device SSO**: how macOS Platform SSO and the Windows Primary Refresh Token (PRT) sign a user in to the device, and how that carries on into browser SSO for SAML and OIDC apps, with what to check when the user is prompted anyway. Also the **Flow tracer training**: seven hands-on exercises that take a new admin from reading an example sign-in to capturing one, breaking one in the lab, diagnosing it and sharing a redacted copy. Read-only reading, no tenant access. |
+| Learn | Opens with **SSO vs OAuth vs OIDC vs SAML**: an animated explainer in seven short scenes (the two questions every sign-in answers, SSO, OAuth 2.0, OpenID Connect, SAML 2.0, how they work together, and a cheat sheet). It matches the light or dark theme, shows a still picture if you have reduced motion turned on, and has the same content as text under **Read it as text**. Then how to create, maintain and remove each kind of integration, sequence diagrams of every flow, a glossary and a troubleshooting method. Includes **Device SSO**: how macOS Platform SSO and the Windows Primary Refresh Token (PRT) sign a user in to the device, and how that carries on into browser SSO for SAML and OIDC apps, with what to check when the user is prompted anyway. Also the **Flow tracer training**: seven hands-on exercises that take a new admin from reading an example sign-in to capturing one, breaking one in the lab, diagnosing it and sharing a redacted copy. Read-only reading, no tenant access. |
 | Build your lab | Click-by-click steps and a kit (`lab/`) to build your own free Entra practice tenant with Terraform. |
 
 ## Where each part stands
@@ -86,7 +91,7 @@ Honest status, so you know what has been proven and what hasn't.
 | **Run against a real free Entra test tenant** | Build your lab, Discover, Live test (SAML, OpenID Connect and client credentials), SCIM lab. |
 | **Built and unit-tested, not yet run for real** | Federation 360 Capture extension (tested end to end in Chromium against a stand-in sign-in server; it loads and connects in Edge and Chrome, but a capture of a real Entra sign-in has not been confirmed yet). Flow tracer's Entra's verdict and `signin-logs/Connect-F360SignInLogs.ps1` (tested with Microsoft Graph mocked; needs an Entra ID P1 tenant to run for real). Connectivity test script (not yet published through Intune to managed devices). |
 | **Tried on the built-in sample data only** | OAuth grants, MFA and SSO coverage, Detections (including Read from your tenant), Investigate, How access ends, Activity, User lookup. Their PowerShell scripts, `posture/Export-F360Posture.ps1`, `detections/Export-F360SignIns.ps1`, `access/Export-F360Access.ps1`, `activity/Export-F360Activity.ps1` and `lookup/Export-F360UserAccess.ps1`, have not been run yet. |
-| **Reference content** | Start here, Learn (including Device SSO), Setup wizards, Playbooks, and the SAML, JWT, SCIM and metadata decoders, which work on anything you paste. |
+| **Reference content** | Start here, Learn (including the SSO vs OAuth vs OIDC vs SAML animation and Device SSO), Setup wizards, Playbooks, and the SAML, JWT, SCIM and metadata decoders, which work on anything you paste. |
 | **Not built yet** | Identity settings kept as Terraform with drift checks, a SCIM joiner/mover/leaver test run, and access review sheets. |
 
 ## Use it
@@ -126,6 +131,19 @@ npm run dev      # http://localhost:5173
 npm test         # unit tests
 npm run build    # dist/index.html, one self-contained file
 ```
+
+### Reading your tenant from the protect pages
+
+MFA and SSO coverage, How access ends, Activity and User lookup read the tenant the same two ways, and both are
+read-only (Detections and Investigate have **Read from your tenant**, the same browser sign-in):
+
+1. **PowerShell.** **Copy run command** puts one line on your clipboard that carries the whole export script and runs
+   it in PowerShell 7 without saving a `.ps1` file. You can also download the script and read it first. Load the file
+   it saves on the same page.
+2. **Sign in from this page** (when the app runs on `http://localhost:5173`). Uses the client ID of your
+   `F360-Discovery` app registration. Federation 360 remembers the client ID for each tenant ID, and if it is missing,
+   a note under the greyed-out sign-in button says what to fill in. When Graph refuses a request, the message names
+   the request and the permission it needs.
 
 ## What it sends, and where
 
@@ -289,6 +307,17 @@ cd $HOME\federation-360
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\connectivity\Test-F360Connectivity.ps1 -PlanPath "$HOME\Downloads\f360-plan-<id>.json" -OutputDir "$HOME\federation-360\connectivity\results"
 ```
 
+## The 360 family
+
+Federation 360 is one of a set of free tools that share a look and an app switcher (top left, under the name). The
+switcher shows each tool's full name, and links to it once it is published.
+
+| Tool | What it does | How Federation 360 uses it |
+| --- | --- | --- |
+| **Entity 360** ([github.com/sectechtalk/entity-360](https://github.com/sectechtalk/entity-360)) | Read-only identity investigation for one person: sign-ins, roles, devices and account state. | Detections, Activity and Investigate load its timeline CSV exports (`entity-360-<view>-<user id>-<date>.csv`). |
+| **certificates-360** | Certificate and secret inventory. | Reads Federation 360's **Export expiry report** ([format](docs/credentials-export.md)). |
+| **Remediation 360** | Makes changes and rollouts, with its own approval and audit trail. | User lookup and Investigate open it with a contain request filled in. Federation 360 itself never writes to your tenant. |
+
 ## For developers
 
 ### Layout
@@ -337,6 +366,8 @@ one and commit.
 
 - Buttons always have a filled colour that never matches the page; disabled buttons are grey with a dashed border.
   `tests/button-contrast.test.ts` fails the build if a page breaks this.
+- Every section folds and starts collapsed. Wrap each panel in `Section` from `src/components/Section.tsx`; its first
+  child is the heading row. `tests/collapsible-sections.test.tsx` checks every page.
 - Every button shows it is doing something. Use `ActionButton` from `src/components/busy.tsx`: it shows a verb such as
   "Searching…" with a spinner and a seconds counter, then "✓" with what happened or "✗" with the exact error. A busy
   button stays coloured and never looks disabled. `tests/busy-feedback.test.tsx` checks every page.
